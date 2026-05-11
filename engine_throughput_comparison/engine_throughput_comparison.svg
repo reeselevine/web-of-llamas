@@ -1,0 +1,97 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 700 355" width="700" height="355">
+<rect width="100%" height="100%" fill="white"/>
+
+<!-- Legend box -->
+<rect x="50" y="8" width="600" height="26"
+      fill="#f7f7f7" stroke="#111" stroke-width="1.5"/>
+<rect x="118"    y="14" width="14" height="14" fill="#009E73"/>
+<text x="136" y="25" font-size="14" font-family="Georgia, 'Times New Roman', Times, serif" fill="#111" font-weight="bold">wllama</text>
+<rect x="288"    y="14" width="14" height="14" fill="#56B4E9"/>
+<text x="306" y="25" font-size="14" font-family="Georgia, 'Times New Roman', Times, serif" fill="#111" font-weight="bold">WebLLM</text>
+<rect x="458"    y="14" width="14" height="14" fill="#E69F00"/>
+<text x="476" y="25" font-size="14" font-family="Georgia, 'Times New Roman', Times, serif" fill="#111" font-weight="bold">Transformers.js</text>
+
+<!-- ── PANEL 1: Prefill ── -->
+<text x="199.0" y="57" text-anchor="middle" font-size="16" font-weight="bold" font-family="Georgia, 'Times New Roman', Times, serif" fill="#111">Prefill &#x2014; Apple M4 Pro</text>
+<text transform="rotate(-90)" x="-192.0" y="16" text-anchor="middle" font-size="13" font-family="Georgia, 'Times New Roman', Times, serif" fill="#111">tok/s</text>
+
+<line x1="58" y1="310.0" x2="340" y2="310.0" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="53" y="314.0" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">0</text>
+<line x1="58" y1="287.5" x2="340" y2="287.5" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="53" y="291.5" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">200</text>
+<line x1="58" y1="265.0" x2="340" y2="265.0" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="53" y="269.0" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">400</text>
+<line x1="58" y1="242.6" x2="340" y2="242.6" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="53" y="246.6" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">600</text>
+<line x1="58" y1="220.1" x2="340" y2="220.1" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="53" y="224.1" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">800</text>
+<line x1="58" y1="197.6" x2="340" y2="197.6" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="53" y="201.6" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">1000</text>
+<line x1="58" y1="175.1" x2="340" y2="175.1" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="53" y="179.1" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">1200</text>
+<line x1="58" y1="152.7" x2="340" y2="152.7" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="53" y="156.7" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">1400</text>
+<line x1="58" y1="130.2" x2="340" y2="130.2" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="53" y="134.2" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">1600</text>
+<line x1="58" y1="107.7" x2="340" y2="107.7" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="53" y="111.7" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">1800</text>
+<line x1="58" y1="85.2" x2="340" y2="85.2" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="53" y="89.2" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">2000</text>
+
+<line x1="58" y1="74" x2="58" y2="310" stroke="#111" stroke-width="1.5"/>
+<line x1="58" y1="310" x2="340" y2="310" stroke="#111" stroke-width="1.5"/>
+
+<rect x="84.5" y="196.4" width="26" height="113.6" fill="#009E73" rx="2"/>
+<rect x="115.5" y="104.5" width="26" height="205.5" fill="#56B4E9" rx="2"/>
+<text x="128.5" y="99.5" text-anchor="middle" font-size="11" fill="#1a5c35" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">+81%</text>
+<rect x="146.5" y="202.6" width="26" height="107.4" fill="#E69F00" rx="2"/>
+<text x="159.5" y="197.6" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-5%</text>
+<rect x="225.5" y="291.2" width="26" height="18.8" fill="#009E73" rx="2"/>
+<rect x="256.5" y="243.9" width="26" height="66.1" fill="#56B4E9" rx="2"/>
+<text x="269.5" y="238.9" text-anchor="middle" font-size="11" fill="#1a5c35" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">+251%</text>
+<rect x="287.5" y="227.6" width="26" height="82.4" fill="#E69F00" rx="2"/>
+<text x="300.5" y="222.6" text-anchor="middle" font-size="11" fill="#1a5c35" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">+338%</text>
+
+<text x="128" y="328" text-anchor="middle" font-size="14" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">Chrome / fp16</text>
+<text x="270" y="328" text-anchor="middle" font-size="14" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">Safari / fp16</text>
+
+
+<!-- ── PANEL 2: Decode ── -->
+<text x="549.0" y="57" text-anchor="middle" font-size="16" font-weight="bold" font-family="Georgia, 'Times New Roman', Times, serif" fill="#111">Decode &#x2014; Apple M4 Pro</text>
+<text transform="rotate(-90)" x="-192.0" y="386" text-anchor="middle" font-size="13" font-family="Georgia, 'Times New Roman', Times, serif" fill="#111">tok/s</text>
+
+<line x1="408" y1="310.0" x2="690" y2="310.0" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="403" y="314.0" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">0</text>
+<line x1="408" y1="277.4" x2="690" y2="277.4" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="403" y="281.4" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">20</text>
+<line x1="408" y1="244.9" x2="690" y2="244.9" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="403" y="248.9" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">40</text>
+<line x1="408" y1="212.3" x2="690" y2="212.3" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="403" y="216.3" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">60</text>
+<line x1="408" y1="179.8" x2="690" y2="179.8" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="403" y="183.8" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">80</text>
+<line x1="408" y1="147.2" x2="690" y2="147.2" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="403" y="151.2" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">100</text>
+<line x1="408" y1="114.7" x2="690" y2="114.7" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="403" y="118.7" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">120</text>
+<line x1="408" y1="82.1" x2="690" y2="82.1" stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>
+<text x="403" y="86.1" text-anchor="end" font-size="13" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif">140</text>
+
+<line x1="408" y1="74" x2="408" y2="310" stroke="#111" stroke-width="1.5"/>
+<line x1="408" y1="310" x2="690" y2="310" stroke="#111" stroke-width="1.5"/>
+
+<rect x="434.5" y="189.2" width="26" height="120.8" fill="#009E73" rx="2"/>
+<rect x="465.5" y="226.7" width="26" height="83.3" fill="#56B4E9" rx="2"/>
+<text x="478.5" y="221.7" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-31%</text>
+<rect x="496.5" y="247.7" width="26" height="62.3" fill="#E69F00" rx="2"/>
+<text x="509.5" y="242.7" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-48%</text>
+<rect x="575.5" y="212.0" width="26" height="98.0" fill="#009E73" rx="2"/>
+<rect x="606.5" y="239.9" width="26" height="70.1" fill="#56B4E9" rx="2"/>
+<text x="619.5" y="234.9" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-28%</text>
+<rect x="637.5" y="273.9" width="26" height="36.1" fill="#E69F00" rx="2"/>
+<text x="650.5" y="268.9" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-63%</text>
+
+<text x="478" y="328" text-anchor="middle" font-size="14" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">Chrome / fp16</text>
+<text x="620" y="328" text-anchor="middle" font-size="14" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">Safari / fp16</text>
+
+</svg>
