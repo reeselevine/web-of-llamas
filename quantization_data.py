@@ -15,7 +15,7 @@ from collections import defaultdict
 from statistics import median
 
 from portability_bench import resolve_device
-from portability_main_2x2 import chrome_unless_only_safari
+from portability_main_2x2 import chrome_unless_only_safari, _dedup_one_per_cell
 
 
 RUNS_DIR = "/tmp/webgpu-all/runs"
@@ -75,37 +75,39 @@ def load_llama_records(runs_dir):
                 "label": label,
                 "variant": rec.get("variant"),
                 "browser": (rec.get("browser") or "").lower(),
+                "nReps": rec.get("nReps") or 0,
+                "timestamp": rec.get("timestamp") or "",
                 "metric": metric,
             })
     return raw
 
 
 def chrome_filter(raw):
-    """Same browser-preference rule as the portability scripts."""
+    """Browser-preference rule, then one record per (device, variant)
+    using the max-nReps / latest-timestamp dedup policy."""
     by_device = defaultdict(list)
     for r in raw:
         by_device[r["label"]].append(r)
-    out = []
+    browser_filtered = []
     for recs in by_device.values():
-        out.extend(chrome_unless_only_safari(recs))
-    return out
+        browser_filtered.extend(chrome_unless_only_safari(recs))
+    return _dedup_one_per_cell(
+        browser_filtered,
+        cell_key=lambda r: (r["label"], r["family"], r["variant"]),
+    )
 
 
 def aggregate(records):
-    """{label: {variant: {metric_key: median_value, '_family': family}}}."""
-    accum = defaultdict(lambda: defaultdict(lambda: defaultdict(list)))
-    family_of = {}
+    """{label: {variant: {metric_key: value, '_family': family}}}.
+
+    Records are already deduped to one entry per (device, variant)
+    upstream, so no further median is needed."""
+    out = defaultdict(dict)
     for r in records:
-        family_of[r["label"]] = r["family"]
-        for k, v in r["metric"].items():
-            if v is None:
-                continue
-            accum[r["label"]][r["variant"]][k].append(v)
-    out = {}
-    for label, by_var in accum.items():
-        out[label] = {"_family": family_of[label]}
-        for var, metrics in by_var.items():
-            out[label][var] = {k: median(vs) for k, vs in metrics.items()}
+        out[r["label"]]["_family"] = r["family"]
+        out[r["label"]][r["variant"]] = {
+            k: v for k, v in r["metric"].items() if v is not None
+        }
     return out
 
 

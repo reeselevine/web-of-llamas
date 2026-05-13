@@ -24,6 +24,7 @@ from portability_bench import resolve_device
 from portability_main_2x2 import (
     aggregate_by_bucket, assign_cluster_buckets,
     chrome_unless_only_safari, draw_panel,
+    _dedup_one_per_cell,
     load_filtered as load_portability_records,
 )
 
@@ -86,20 +87,26 @@ def load_quant_records(runs_dir):
                 "family": family,
                 "label": label,
                 "variant": rec.get("variant"),
-                # aggregate_by_bucket uses key_field; we want to group
-                # by quantization variant, so expose it under "model"
-                # as a convenience shim, plus an explicit "variant".
                 "browser": (rec.get("browser") or "").lower(),
+                "nReps": rec.get("nReps") or 0,
+                "timestamp": rec.get("timestamp") or "",
                 "metric": metric,
             })
 
     by_device = defaultdict(list)
     for r in raw:
         by_device[r["label"]].append(r)
-    out = []
+    browser_filtered = []
     for recs in by_device.values():
-        out.extend(chrome_unless_only_safari(recs))
-    return out
+        browser_filtered.extend(chrome_unless_only_safari(recs))
+
+    # Same dedup policy as the portability loader: keep one record per
+    # (device, variant, depth-class), pick by highest nReps then latest
+    # timestamp, merge d0+d2048 into a single record per cell.
+    return _dedup_one_per_cell(
+        browser_filtered,
+        cell_key=lambda r: (r["label"], r["family"], r["variant"]),
+    )
 
 
 def print_summary(agg, bucket_order):
