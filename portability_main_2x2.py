@@ -168,11 +168,13 @@ def load_filtered(runs_dir):
     return out
 
 
-def aggregate_by_bucket(records, device_bucket=None, exclude_labels=()):
-    """{model_id: {bucket: {metric_key: median_value}}}
+def aggregate_by_bucket(records, device_bucket=None, exclude_labels=(),
+                        key_field="model"):
+    """{x_key: {bucket: {metric_key: median_value}}}
 
-    device_bucket: dict mapping device label -> bucket name (or None to
-    exclude). Defaults to the module-level RAM-based DEVICE_BUCKET.
+    key_field selects what becomes the outer dictionary key — "model"
+    for the portability figure (one row per model) or "variant" for the
+    quantization figure (one row per quantization).
     """
     if device_bucket is None:
         device_bucket = DEVICE_BUCKET
@@ -183,14 +185,17 @@ def aggregate_by_bucket(records, device_bucket=None, exclude_labels=()):
         bucket = device_bucket.get(r["label"])
         if bucket is None:
             continue
+        xkey = r.get(key_field)
+        if xkey is None:
+            continue
         for k, v in r["metric"].items():
             if v is None:
                 continue
-            accum[r["model"]][bucket][k].append(v)
+            accum[xkey][bucket][k].append(v)
     out = {}
-    for model, by_bucket in accum.items():
-        out[model] = {b: {k: median(vs) for k, vs in metrics.items()}
-                      for b, metrics in by_bucket.items()}
+    for xkey, by_bucket in accum.items():
+        out[xkey] = {b: {k: median(vs) for k, vs in metrics.items()}
+                     for b, metrics in by_bucket.items()}
     return out
 
 
@@ -200,35 +205,42 @@ def aggregate_by_bucket(records, device_bucket=None, exclude_labels=()):
 
 def draw_panel(ax, agg, key_d0, key_d2k,
                bucket_order, bucket_colors, legend_title,
-               *, with_legend=True, with_xticklabels=True):
-    """Draw the bar panel + legends onto a given Axes."""
-    n_models = len(MODEL_ORDER)
-    n_buckets = len(bucket_order)
-    x = np.arange(n_models)
+               *, x_order=None, with_legend=True, with_xticklabels=True):
+    """Draw the bar panel + legends onto a given Axes.
 
-    # Bar width assumes the max possible bars per model so widths stay
-    # constant across the figure. For each model we drop any
-    # (cluster, depth) slot with no data and center the visible bars
-    # within the group, so missing data compacts instead of leaving a
-    # confusing hole — the eye can still pair the bars.
+    x_order is a list of (key, display_label) tuples — defaults to
+    MODEL_ORDER for the portability figures; quantization passes
+    VARIANT_ORDER.
+    """
+    if x_order is None:
+        x_order = MODEL_ORDER
+    n_x = len(x_order)
+    n_buckets = len(bucket_order)
+    x = np.arange(n_x)
+
+    # Bar width assumes the max possible bars per x-slot so widths stay
+    # constant across the figure. For each slot we drop any (bucket,
+    # depth) entry with no data and center the visible bars within the
+    # group, so missing data compacts instead of leaving a confusing
+    # hole — the eye can still pair the bars.
     n_bars_max = n_buckets * 2
     bar_width = 0.92 / n_bars_max
 
     all_vals = []
     for bucket in bucket_order:
-        for mid, _ in MODEL_ORDER:
-            cell = agg.get(mid, {}).get(bucket, {}) or {}
+        for xk, _ in x_order:
+            cell = agg.get(xk, {}).get(bucket, {}) or {}
             for k in (key_d0, key_d2k):
                 v = cell.get(k)
                 if v is not None:
                     all_vals.append(v)
     panel_max = max(all_vals) if all_vals else 1.0
 
-    for mi, (mid, _) in enumerate(MODEL_ORDER):
+    for xi, (xk, _) in enumerate(x_order):
         entries = []
         for bucket in bucket_order:
             color = bucket_colors[bucket]
-            cell = agg.get(mid, {}).get(bucket, {}) or {}
+            cell = agg.get(xk, {}).get(bucket, {}) or {}
             for di, key in enumerate((key_d0, key_d2k)):
                 v = cell.get(key)
                 if v is None or (isinstance(v, float) and np.isnan(v)):
@@ -240,7 +252,7 @@ def draw_panel(ax, agg, key_d0, key_d2k,
         local_offsets = (np.arange(n) - (n - 1) / 2) * bar_width
         for slot, (val, color, hatch) in enumerate(entries):
             ax.bar(
-                mi + local_offsets[slot],
+                xi + local_offsets[slot],
                 val,
                 width=bar_width,
                 color=color,
@@ -259,7 +271,7 @@ def draw_panel(ax, agg, key_d0, key_d2k,
     ax.spines["right"].set_visible(False)
     ax.set_xticks(x)
     if with_xticklabels:
-        ax.set_xticklabels([disp for _, disp in MODEL_ORDER],
+        ax.set_xticklabels([disp for _, disp in x_order],
                            rotation=0, ha="center", fontsize=12)
     else:
         ax.set_xticklabels([])
@@ -424,10 +436,25 @@ def assign_cluster_buckets(records, k=3):
     cluster_idx, inertia, _ = kmeans(X, k)
     print(f"\nChose k={k}; inertia={inertia:.4f}")
 
-    # Order clusters by mean log throughput so "Cluster A" is always the
-    # fastest set of devices and colouring stays stable across reruns.
+    # Order clusters by *measured* throughput (ignoring imputed cells)
+    # so "Cluster A" is the fastest devices, "B" the mid-tier, and "C"
+    # the slowest. Ranking off the post-imputation feature matrix
+    # inflates devices with lots of missing cells (iPhones get the
+    # dataset median per column), which previously flipped B and C.
+    device_mean_log = {}
+    for r in records:
+        if r["label"] in CLUSTER_EXCLUDE:
+            continue
+        for v in r["metric"].values():
+            if v is None:
+                continue
+            device_mean_log.setdefault(r["label"], []).append(np.log1p(v))
+    device_mean_log = {lbl: float(np.mean(vs))
+                       for lbl, vs in device_mean_log.items()}
+    label_arr = np.array(labels)
     mean_per_cluster = np.array([
-        X[cluster_idx == c].sum(axis=1).mean()
+        float(np.mean([device_mean_log[lbl]
+                       for lbl in label_arr[cluster_idx == c]]))
         for c in range(k)
     ])
     order = np.argsort(-mean_per_cluster)

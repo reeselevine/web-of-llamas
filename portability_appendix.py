@@ -79,22 +79,30 @@ def slugify(s):
 # Aggregation: per (model, device_label) -> {metrics, family}
 # ----------------------------------------------------------------------
 
-def aggregate_per_device(records):
+def aggregate_per_device(records, key_field="model"):
+    """{x_key: {device_label: {family, metrics}}}.
+
+    key_field defaults to "model" for the portability study; quantization
+    passes "variant" so the outer key is the quantization format.
+    """
     accum = defaultdict(lambda: defaultdict(
         lambda: {"family": None, "metrics": defaultdict(list)}
     ))
     for r in records:
-        cell = accum[r["model"]][r["label"]]
+        xkey = r.get(key_field)
+        if xkey is None:
+            continue
+        cell = accum[xkey][r["label"]]
         cell["family"] = r["family"]
         for k, v in r["metric"].items():
             if v is not None:
                 cell["metrics"][k].append(v)
 
     out = {}
-    for model, by_dev in accum.items():
-        out[model] = {}
+    for xkey, by_dev in accum.items():
+        out[xkey] = {}
         for label, cell in by_dev.items():
-            out[model][label] = {
+            out[xkey][label] = {
                 "family": cell["family"],
                 "metrics": {k: median(vs) for k, vs in cell["metrics"].items()},
             }
@@ -116,14 +124,19 @@ def ordered_devices(per_device):
 # App-A: coverage heatmap
 # ----------------------------------------------------------------------
 
-def plot_coverage(per_device, key_d0, key_d2k, phase_label, output_path):
+def plot_coverage(per_device, key_d0, key_d2k, phase_label, output_path,
+                  x_order=None):
     """Coverage heatmap for one phase (prefill or decode).
 
     phase_label is e.g. "Prefill" / "Decode" and only appears on the
     colorbar legend; the caption explains the figure.
+    x_order defaults to MODEL_ORDER (portability study). Quantization
+    passes VARIANT_ORDER.
     """
+    if x_order is None:
+        x_order = MODEL_ORDER
     devices = ordered_devices(per_device)         # [(label, family), ...]
-    models = MODEL_ORDER                          # [(id, display), ...]
+    models = x_order                              # [(key, display), ...]
 
     def grid_for(metric_key):
         g = np.full((len(devices), len(models)), np.nan)
