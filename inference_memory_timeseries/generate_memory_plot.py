@@ -105,16 +105,16 @@ def style_ax(ax, title, ylim, ylabel=False):
     ax.set_xlim(0, TMAX)
     ax.set_ylim(0, ylim)
     ax.set_xticks([0, 5, 10, 15])
-    ax.set_xticklabels(["0s", "5s", "10s", "15s"], fontsize=10)
-    ax.tick_params(axis="y", labelsize=10)
+    ax.set_xticklabels(["0s", "5s", "10s", "15s"], fontsize=18)
+    ax.tick_params(axis="y", labelsize=18)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(fmt_mb))
     ax.grid(axis="y", color="#d9d9d9", linewidth=0.8, alpha=0.8)
     ax.set_axisbelow(True)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.set_title(title, fontsize=12, fontweight="bold")
+    ax.set_title(title, fontsize=20, fontweight="bold")
     if ylabel:
-        ax.set_ylabel("Memory (MB)", fontsize=11)
+        ax.set_ylabel("Memory (MB)", fontsize=20)
 
 def plot_lines(ax, datasets, lw=2.0):
     for data, color in datasets:
@@ -122,46 +122,48 @@ def plot_lines(ax, datasets, lw=2.0):
         ax.plot(ts, ms, color=color, linewidth=lw)
 
 # ── Figure ────────────────────────────────────────────────────────────────────
-fig, axes = plt.subplots(2, 2, figsize=(11, 8))
+fig, axes = plt.subplots(2, 2, figsize=(11, 9))
 
 # Top row — Apple M4 Pro (ylim 10k)
 plot_lines(axes[0, 0], [(m4c_wllama, WLLAMA), (m4c_webllm, WEBLLM), (m4c_tjs, TJS)])
-style_ax(axes[0, 0], "Apple M4 Pro / Chrome", ylim=10000, ylabel=True)
+style_ax(axes[0, 0], "Apple M4 Pro\nChrome", ylim=10000, ylabel=True)
 
 plot_lines(axes[0, 1], [(m4s_wllama, WLLAMA), (m4s_webllm, WEBLLM), (m4s_tjs, TJS)])
-style_ax(axes[0, 1], "Apple M4 Pro / Safari", ylim=10000)
+style_ax(axes[0, 1], "Apple M4 Pro\nSafari", ylim=10000)
 if oom_pt:
     tx, ty = oom_pt
     axes[0, 1].plot(tx, ty, 'x', color=OOM_C, markersize=10, markeredgewidth=2.5, zorder=5)
     axes[0, 1].annotate("OOM", (tx, ty), xytext=(6, 0),
                          textcoords="offset points",
-                         va="center", fontsize=10,
+                         va="center", fontsize=16,
                          color=OOM_C, fontweight="bold")
 
 # Bottom row — NVIDIA RTX 5080 (ylim 12k)
 plot_lines(axes[1, 0], [(nv_wllama, WLLAMA), (nv_webllm, WEBLLM), (nv_tjs, TJS)])
-style_ax(axes[1, 0], "NVIDIA RTX 5080 (Linux) / Chrome", ylim=12000, ylabel=True)
+style_ax(axes[1, 0], "NVIDIA RTX 5080 (Linux)\nChrome", ylim=12000, ylabel=True)
 
 plot_lines(axes[1, 1], [(win_wllama, WLLAMA), (win_webllm, WEBLLM), (win_tjs, TJS)])
-style_ax(axes[1, 1], "NVIDIA RTX 5080 (Windows) / Chrome", ylim=12000)
+style_ax(axes[1, 1], "NVIDIA RTX 5080 (Windows)\nChrome", ylim=12000)
 
 # Shared x-axis label
-fig.text(0.5, 0.01, "Elapsed time (s)", ha="center", fontsize=12)
+fig.text(0.5, 0.0, "Elapsed time (s)", ha="center", fontsize=20)
 
-# Legend (top-left panel)
+# Legend below all panels
 legend_handles = [
     Line2D([0], [0], color=WLLAMA, linewidth=2.5, label="wllama"),
     Line2D([0], [0], color=WEBLLM, linewidth=2.5, label="WebLLM"),
     Line2D([0], [0], color=TJS,    linewidth=2.5, label="Transformers.js"),
 ]
-axes[0, 0].legend(
+fig.legend(
     handles=legend_handles,
-    loc="upper left",
+    loc="lower center",
+    ncol=3,
+    bbox_to_anchor=(0.5, 0.02),
     frameon=True, facecolor="white",
     edgecolor="#cfcfcf", framealpha=0.95,
-    fontsize=10,
+    fontsize=16,
 )
 
-fig.tight_layout(rect=[0, 0.03, 1, 1])
+fig.tight_layout(rect=[0, 0.08, 1, 1])
 fig.savefig(OUT, bbox_inches="tight")
 print(f"Written {OUT}")

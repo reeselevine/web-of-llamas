@@ -94,14 +94,14 @@ for ax, pidx, title in [
                 x[gi] + offs[bi], label_ys[bi],
                 f"{sign}{pct:.0f}%",
                 ha="center", va="bottom",
-                fontsize=8.5, color=col, fontweight="bold", zorder=4,
+                fontsize=15, color=col, fontweight="bold", zorder=4,
             )
 
-    ax.set_title(title, fontsize=14, fontweight="bold", pad=6)
+    ax.set_title(title, fontsize=22, fontweight="bold", pad=10)
     ax.set_xticks(x)
-    ax.set_xticklabels([g[0] for g in plot_groups], fontsize=13)
-    ax.tick_params(axis="y", labelsize=11)
-    ax.set_ylabel("tok / s", fontsize=13)
+    ax.set_xticklabels([g[0] for g in plot_groups], fontsize=18)
+    ax.tick_params(axis="y", labelsize=18)
+    ax.set_ylabel("tok / s", fontsize=20)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(fmt_tps))
     ax.grid(axis="y", color="#d9d9d9", linewidth=0.8, alpha=0.8)
     ax.set_axisbelow(True)
@@ -112,7 +112,7 @@ axes[0].legend(
     loc="upper right",
     frameon=True, facecolor="white",
     edgecolor="#cfcfcf", framealpha=0.95,
-    fontsize=11,
+    fontsize=16,
 )
 
 fig.tight_layout()
