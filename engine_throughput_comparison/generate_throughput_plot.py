@@ -1,186 +1,120 @@
 #!/usr/bin/env python3
 """
-Generate 2-panel throughput comparison SVG (Prefill / Decode) — side by side.
+Generate 2-panel throughput comparison figure (Prefill / Decode) — Apple M4 Pro.
 Groups shown: Chrome/fp16, Safari/fp16  (q4 data kept but not plotted)
-Engines per group: wllama, WebLLM, Transformers.js
+Engines: wllama, WebLLM, Transformers.js
 
 Usage: python3 generate_throughput_plot.py
-Output: engine_throughput_comparison.svg
+Output: engine_throughput_comparison.pdf
 """
 
-OUT  = 'engine_throughput_comparison.svg'
-FONT = "Georgia, 'Times New Roman', Times, serif"
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+import numpy as np
 
-# ── Colors (Wong colorblind-safe palette) ─────────────────────────────────────
-WLLAMA = "#009E73"   # bluish green  (Wong)
-WEBLLM = "#56B4E9"   # sky blue      (Wong)
-TJS    = "#E69F00"   # orange        (Wong)
-NATIVE = "#CC79A7"   # reddish purple (Wong)
+OUT = "engine_throughput_comparison.pdf"
 
-POS_PCT = "#1a5c35"  # dark green for positive % labels
-NEG_PCT = "#7a1515"  # dark red for negative % labels
+# ── Colors (Wong colorblind-safe) ──────────────────────────────────────────────
+WLLAMA  = "#009E73"
+WEBLLM  = "#56B4E9"
+TJS     = "#E69F00"
+POS_PCT = "#1a5c35"
+NEG_PCT = "#7a1515"
 
 # ── Data ──────────────────────────────────────────────────────────────────────
-# Groups: (label, wllama_prefill, wllama_decode,
-#                 webllm_prefill, webllm_decode,
-#                 tjs_prefill,   tjs_decode)
+# (label, wllama_pre, wllama_dec, webllm_pre, webllm_dec, tjs_pre, tjs_dec)
 groups = [
     ("Chrome / fp16", 1010.5, 74.2,  1828.2, 51.2,  955.3,  38.3),
     ("Safari / fp16", 167.5,  60.2,  588.4,  43.1,  732.9,  22.2),
     ("Chrome / q4",   611.5,  110.0, 1832.3, 68.1,  959.3,  124.4),
     ("Safari / q4",   152.5,  63.0,  501.5,  62.0,  634.8,  50.3),
 ]
-
-native = {
-    "q4_k_m": {"prefill": 2843.7, "decode": 180.3},
-    "fp16":   {"prefill": 3140.1, "decode": 85.2},
-}
-
-# Only fp16 groups are plotted
 plot_groups = [g for g in groups if "fp16" in g[0]]
 
-# ── Layout ────────────────────────────────────────────────────────────────────
-W       = 700
-H       = 355
-HALF    = W // 2        # 350 — boundary between left and right panels
-LMARGIN = 58
-RMARGIN = 10
+engines = ["wllama", "WebLLM", "Transformers.js"]
+clrs    = [WLLAMA, WEBLLM, TJS]
 
-NG = len(plot_groups)   # 2
-NB = 3                  # bars per group (wllama, WebLLM, TJS)
-BAR_W    = 26
-BAR_GAP  = 5
-TOTAL_BW = NB * BAR_W + (NB - 1) * BAR_GAP   # 88px
+# ── Y-axis formatter ──────────────────────────────────────────────────────────
+def fmt_tps(v, _):
+    if v >= 1000:
+        return f"{int(v / 1000)}k" if v % 1000 == 0 else f"{v / 1000:.1f}k"
+    return f"{int(v)}" if v == int(v) else f"{v:.0f}"
 
-# Horizontal extents of each panel's plot area
-P1_X0 = LMARGIN           # 58
-P1_X1 = HALF - RMARGIN    # 340
-P2_X0 = HALF + LMARGIN    # 408
-P2_X1 = W - RMARGIN       # 690
+# ── Figure ────────────────────────────────────────────────────────────────────
+fig, axes = plt.subplots(1, 2, figsize=(11, 4.8))
 
-GROUP_W = (P1_X1 - P1_X0) / NG   # same width for both panels
+x     = np.arange(len(plot_groups))
+NB    = 3
+bar_w = 0.22
+offs  = (np.arange(NB) - (NB - 1) / 2) * (bar_w + 0.03)
 
-# Shared vertical extents
-P_Y0 = 74    # plot top
-P_Y1 = 310   # plot bottom
+for ax, pidx, title in [
+    (axes[0], 0, "Prefill  —  Apple M4 Pro"),
+    (axes[1], 1, "Decode  —  Apple M4 Pro"),
+]:
+    # engine_vals[bi][gi] = value for engine bi, group gi
+    engine_vals = [
+        [row[1 + pidx + 2 * bi] for row in plot_groups]
+        for bi in range(NB)
+    ]
 
-P_YMAX_1 = 2100   # prefill scale
-P_YMAX_2 = 145    # decode scale
+    for bi, (engine, color, ev) in enumerate(zip(engines, clrs, engine_vals)):
+        ax.bar(
+            x + offs[bi], ev,
+            width=bar_w, color=color,
+            edgecolor="#2f2f2f", linewidth=0.6,
+            label=engine, zorder=3,
+        )
 
-GRIDS_1 = list(range(0, 2001, 200))
-GRIDS_2 = list(range(0, 141, 20))
+    # set ylim before placing % labels so headroom is correct
+    data_max = max(v for ev in engine_vals for v in ev)
+    ax.set_ylim(0, data_max * 1.25)
 
-# ── Helpers ───────────────────────────────────────────────────────────────────
-def bar_x(gi, bi, x0):
-    group_start = x0 + gi * GROUP_W
-    offset = (GROUP_W - TOTAL_BW) / 2
-    return group_start + offset + bi * (BAR_W + BAR_GAP)
+    # % labels vs wllama (bi=0)
+    for gi in range(len(plot_groups)):
+        base = engine_vals[0][gi]
+        label_ys = {}
+        for bi in (1, 2):
+            val = engine_vals[bi][gi]
+            label_ys[bi] = val + data_max * 0.008
 
-def yp(v, ymax, y0, y1):
-    return max(y0, y1 - (v / ymax) * (y1 - y0))
+        # nudge apart if too close in y
+        MIN_GAP = data_max * 0.06
+        if abs(label_ys[1] - label_ys[2]) < MIN_GAP:
+            mid = (label_ys[1] + label_ys[2]) / 2
+            label_ys[1] = mid - MIN_GAP / 2
+            label_ys[2] = mid + MIN_GAP / 2
 
-def yg(v, ymax, y0, y1):
-    return y1 - (v / ymax) * (y1 - y0)
+        for bi in (1, 2):
+            val  = engine_vals[bi][gi]
+            pct  = (val - base) / base * 100
+            sign = "+" if pct >= 0 else ""
+            col  = POS_PCT if pct >= 0 else NEG_PCT
+            ax.text(
+                x[gi] + offs[bi], label_ys[bi],
+                f"{sign}{pct:.0f}%",
+                ha="center", va="bottom",
+                fontsize=8.5, color=col, fontweight="bold", zorder=4,
+            )
 
-def group_cx(gi, x0):
-    return x0 + gi * GROUP_W + GROUP_W / 2
+    ax.set_title(title, fontsize=14, fontweight="bold", pad=6)
+    ax.set_xticks(x)
+    ax.set_xticklabels([g[0] for g in plot_groups], fontsize=13)
+    ax.tick_params(axis="y", labelsize=11)
+    ax.set_ylabel("tok / s", fontsize=13)
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(fmt_tps))
+    ax.grid(axis="y", color="#d9d9d9", linewidth=0.8, alpha=0.8)
+    ax.set_axisbelow(True)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
 
-def make_grids(vals, ymax, y0, y1, x0, x1):
-    out = ""
-    for v in vals:
-        y = yg(v, ymax, y0, y1)
-        out += (f'<line x1="{x0}" y1="{y:.1f}" x2="{x1}" y2="{y:.1f}" '
-                f'stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>\n')
-        out += (f'<text x="{x0-5}" y="{y+4:.1f}" text-anchor="end" font-size="13" '
-                f'fill="#111" font-family="{FONT}">{v}</text>\n')
-    return out
+axes[0].legend(
+    loc="upper right",
+    frameon=True, facecolor="white",
+    edgecolor="#cfcfcf", framealpha=0.95,
+    fontsize=11,
+)
 
-def make_bars(panel_idx, ymax, y0, y1, x0):
-    """panel_idx: 0=prefill, 1=decode"""
-    out = ""
-    for gi, row in enumerate(plot_groups):
-        label, wp, wd, wlp, wld, tp, td = row
-        w_val  = wp  if panel_idx == 0 else wd
-        wl_val = wlp if panel_idx == 0 else wld
-        t_val  = tp  if panel_idx == 0 else td
-
-        for bi, (val, col) in enumerate([(w_val, WLLAMA), (wl_val, WEBLLM), (t_val, TJS)]):
-            bx = bar_x(gi, bi, x0)
-            cx = bx + BAR_W / 2
-            by = yp(val, ymax, y0, y1)
-            bh = y1 - by
-            out += f'<rect x="{bx:.1f}" y="{by:.1f}" width="{BAR_W}" height="{bh:.1f}" fill="{col}" rx="2"/>\n'
-
-            if bi > 0:
-                pct  = (val - w_val) / w_val * 100
-                sign = "+" if pct >= 0 else ""
-                pcol = POS_PCT if pct >= 0 else NEG_PCT
-                label_y = max(y0 + 10, by - 5)
-                out += (f'<text x="{cx:.1f}" y="{label_y:.1f}" text-anchor="middle" '
-                        f'font-size="11" fill="{pcol}" font-family="{FONT}" '
-                        f'font-weight="bold">{sign}{pct:.0f}%</text>\n')
-    return out
-
-def make_xlabels(y_base, x0):
-    out = ""
-    for gi, row in enumerate(plot_groups):
-        cx = group_cx(gi, x0)
-        out += (f'<text x="{cx:.0f}" y="{y_base}" text-anchor="middle" font-size="14" '
-                f'fill="#111" font-family="{FONT}" font-weight="bold">{row[0]}</text>\n')
-    return out
-
-def axes(y0, y1, x0, x1):
-    return (f'<line x1="{x0}" y1="{y0}" x2="{x0}" y2="{y1}" stroke="#111" stroke-width="1.5"/>\n'
-            f'<line x1="{x0}" y1="{y1}" x2="{x1}" y2="{y1}" stroke="#111" stroke-width="1.5"/>\n')
-
-# ── Legend geometry ───────────────────────────────────────────────────────────
-# Three swatches spaced evenly at W/4, W/2, 3W/4
-LEG_X, LEG_Y, LEG_W, LEG_H = 50, 8, 600, 26
-LEG_PAD_Y = 6
-TEXT_Y    = LEG_Y + LEG_PAD_Y + 11
-
-SW1_X = 118   # wllama  swatch x
-SW2_X = 288   # WebLLM  swatch x
-SW3_X = 458   # TJS     swatch x
-
-# ── Build SVG ──────────────────────────────────────────────────────────────────
-P1_CX = (P1_X0 + P1_X1) / 2
-P2_CX = (P2_X0 + P2_X1) / 2
-TITLE_Y = 57
-YLABEL_MID = -(P_Y0 + P_Y1) / 2   # rotated-coordinate midpoint (shared)
-
-svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}">
-<rect width="100%" height="100%" fill="white"/>
-
-<!-- Legend box -->
-<rect x="{LEG_X}" y="{LEG_Y}" width="{LEG_W}" height="{LEG_H}"
-      fill="#f7f7f7" stroke="#111" stroke-width="1.5"/>
-<rect x="{SW1_X}"    y="{LEG_Y + LEG_PAD_Y}" width="14" height="14" fill="{WLLAMA}"/>
-<text x="{SW1_X+18}" y="{TEXT_Y}" font-size="14" font-family="{FONT}" fill="#111" font-weight="bold">wllama</text>
-<rect x="{SW2_X}"    y="{LEG_Y + LEG_PAD_Y}" width="14" height="14" fill="{WEBLLM}"/>
-<text x="{SW2_X+18}" y="{TEXT_Y}" font-size="14" font-family="{FONT}" fill="#111" font-weight="bold">WebLLM</text>
-<rect x="{SW3_X}"    y="{LEG_Y + LEG_PAD_Y}" width="14" height="14" fill="{TJS}"/>
-<text x="{SW3_X+18}" y="{TEXT_Y}" font-size="14" font-family="{FONT}" fill="#111" font-weight="bold">Transformers.js</text>
-
-<!-- ── PANEL 1: Prefill ── -->
-<text x="{P1_CX:.1f}" y="{TITLE_Y}" text-anchor="middle" font-size="16" font-weight="bold" font-family="{FONT}" fill="#111">Prefill &#x2014; Apple M4 Pro</text>
-<text transform="rotate(-90)" x="{YLABEL_MID:.1f}" y="16" text-anchor="middle" font-size="13" font-family="{FONT}" fill="#111">tok/s</text>
-
-{make_grids(GRIDS_1, P_YMAX_1, P_Y0, P_Y1, P1_X0, P1_X1)}
-{axes(P_Y0, P_Y1, P1_X0, P1_X1)}
-{make_bars(0, P_YMAX_1, P_Y0, P_Y1, P1_X0)}
-{make_xlabels(P_Y1 + 18, P1_X0)}
-
-<!-- ── PANEL 2: Decode ── -->
-<text x="{P2_CX:.1f}" y="{TITLE_Y}" text-anchor="middle" font-size="16" font-weight="bold" font-family="{FONT}" fill="#111">Decode &#x2014; Apple M4 Pro</text>
-<text transform="rotate(-90)" x="{YLABEL_MID:.1f}" y="{P2_X0 - 22}" text-anchor="middle" font-size="13" font-family="{FONT}" fill="#111">tok/s</text>
-
-{make_grids(GRIDS_2, P_YMAX_2, P_Y0, P_Y1, P2_X0, P2_X1)}
-{axes(P_Y0, P_Y1, P2_X0, P2_X1)}
-{make_bars(1, P_YMAX_2, P_Y0, P_Y1, P2_X0)}
-{make_xlabels(P_Y1 + 18, P2_X0)}
-</svg>'''
-
-with open(OUT, 'w') as f:
-    f.write(svg)
+fig.tight_layout()
+fig.savefig(OUT, bbox_inches="tight")
 print(f"Written {OUT}")

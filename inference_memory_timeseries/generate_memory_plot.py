@@ -1,12 +1,18 @@
 #!/usr/bin/env python3
 """
-Generate 2x2 memory comparison SVG for the wllama paper.
+Generate 2x2 memory comparison figure using matplotlib.
 Usage: python3 generate_memory_plot.py
-Outputs: memory_comparison.svg
+Output: memory_comparison.pdf
 """
 import csv
 import itertools
 from datetime import datetime
+
+import matplotlib.pyplot as plt
+import matplotlib.ticker as mticker
+from matplotlib.lines import Line2D
+
+OUT = "memory_comparison.pdf"
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
 M4C_TJS    = 'apple_m4_pro_chrome_memory_timeseries/m4_chrome_transformers_fp16.csv'
@@ -21,12 +27,17 @@ NV_WLLAMA  = 'linux_nvidia_rtx5080_chrome_memory_timeseries/5080_linux_wllama_q4
 WIN_TJS    = 'windows_nvidia_rtx5080_chrome_timeseries/transformers_fp16_win.csv'
 WIN_WEBLLM = 'windows_nvidia_rtx5080_chrome_timeseries/webllm_q0f16_win.csv'
 WIN_WLLAMA = 'windows_nvidia_rtx5080_chrome_timeseries/wllama_fp16_win.csv'
-OUT        = 'memory_comparison.svg'
 
-TMAX     = 15    # seconds to plot (all panels except Windows)
-WIN_TMAX = 288   # full recording length for Windows panel
+TMAX     = 15
+WIN_TMAX = 15
 
-# ── Helpers ────────────────────────────────────────────────────────────────────
+# ── Colors ────────────────────────────────────────────────────────────────────
+WLLAMA = "#009E73"
+WEBLLM = "#56B4E9"
+TJS    = "#E69F00"
+OOM_C  = "#D55E00"
+
+# ── Data loading ──────────────────────────────────────────────────────────────
 def read_csv(path, mem_col='combined_mb', tmax=TMAX):
     rows = []
     with open(path) as f:
@@ -34,13 +45,11 @@ def read_csv(path, mem_col='combined_mb', tmax=TMAX):
             t = datetime.fromisoformat(r['timestamp'])
             rows.append((t, float(r[mem_col])))
     t0 = rows[0][0]
-    return [((t-t0).total_seconds(), m) for t,m in rows
-            if (t-t0).total_seconds() <= tmax]
+    return [((t - t0).total_seconds(), m) for t, m in rows
+            if (t - t0).total_seconds() <= tmax]
 
 def read_csv_windows(path, tmax=TMAX, trim_start=None, trim_to_steady=False):
-    """Windows CSV has per-process columns; combined_mb = sum(*_priv_mb) + gpu_vram_mb.
-    trim_start: skip leading rows where combined_mb < trim_start before anchoring t=0.
-    trim_to_steady: skip the load spike by starting just after the peak value."""
+    """Windows CSV: combined_mb = sum(*_priv_mb) + gpu_vram_mb."""
     rows = []
     with open(path) as f:
         for r in csv.DictReader(f):
@@ -54,26 +63,25 @@ def read_csv_windows(path, tmax=TMAX, trim_start=None, trim_to_steady=False):
         peak_idx = max(range(len(rows)), key=lambda i: rows[i][1])
         rows = rows[peak_idx + 1:]
     t0 = rows[0][0]
-    return [((t-t0).total_seconds(), m) for t, m in rows
-            if (t-t0).total_seconds() <= tmax]
+    return [((t - t0).total_seconds(), m) for t, m in rows
+            if (t - t0).total_seconds() <= tmax]
 
 def split_oom(data, threshold=100):
-    """Split safari data into valid points and OOM start time."""
     oom_t, valid = None, []
-    for t,m in data:
+    for t, m in data:
         if m < threshold:
             if oom_t is None: oom_t = t
         else:
-            valid.append((t,m))
+            valid.append((t, m))
     return valid, oom_t
 
-# ── Load data ──────────────────────────────────────────────────────────────────
+# ── Load data ─────────────────────────────────────────────────────────────────
 m4c_tjs    = read_csv(M4C_TJS)
 m4c_webllm = read_csv(M4C_WEBLLM)
 m4c_wllama = read_csv(M4C_WLLAMA)
-m4s_tjs_raw= read_csv(M4S_TJS, mem_col='total_mb')
-m4s_webllm = read_csv(M4S_WEBLLM, mem_col='total_mb')
-m4s_wllama = read_csv(M4S_WLLAMA, mem_col='total_mb')
+m4s_tjs_raw = read_csv(M4S_TJS, mem_col='total_mb')
+m4s_webllm  = read_csv(M4S_WEBLLM, mem_col='total_mb')
+m4s_wllama  = read_csv(M4S_WLLAMA, mem_col='total_mb')
 nv_tjs     = read_csv(NV_TJS)
 nv_webllm  = read_csv(NV_WEBLLM)
 nv_wllama  = read_csv(NV_WLLAMA)
@@ -81,176 +89,79 @@ win_tjs    = read_csv_windows(WIN_TJS)
 win_webllm = read_csv_windows(WIN_WEBLLM, trim_start=1000, trim_to_steady=True)
 win_wllama = read_csv_windows(WIN_WLLAMA)
 
-m4s_tjs, oom_t = split_oom(m4s_tjs_raw)
+m4s_tjs, _ = split_oom(m4s_tjs_raw)
+oom_pt = m4s_tjs[-1] if m4s_tjs else None   # (t, m) where line ends
 
-# ── Style ──────────────────────────────────────────────────────────────────────
-FONT   = "Georgia, 'Times New Roman', Times, serif"
-TJS    = "#E69F00"   # orange      (colorblind-safe, Wong 2011)
-WEBLLM = "#56B4E9"   # sky blue
-WLLAMA = "#009E73"   # bluish green
-OOM_C  = "#D55E00"   # vermillion
+# ── Helpers ───────────────────────────────────────────────────────────────────
+def unzip(data):
+    return [t for t, m in data], [m for t, m in data]
 
-# ── Layout ─────────────────────────────────────────────────────────────────────
-W        = 680
-LMARGIN  = 68    # room for y-tick labels
-RMARGIN  = 10
-HGAP     = 24    # gap between left and right panels
-PW       = (W - LMARGIN - RMARGIN - HGAP) / 2   # panel width
+def fmt_mb(v, _):
+    if v >= 1000:
+        return f"{int(v / 1000)}k" if v % 1000 == 0 else f"{v / 1000:.0f}k"
+    return str(int(v))
 
-LEG_Y0   = 8
-LEG_H    = 26
-LEG_Y1   = LEG_Y0 + LEG_H        # 62
+def style_ax(ax, title, ylim, ylabel=False):
+    ax.set_xlim(0, TMAX)
+    ax.set_ylim(0, ylim)
+    ax.set_xticks([0, 5, 10, 15])
+    ax.set_xticklabels(["0s", "5s", "10s", "15s"], fontsize=10)
+    ax.tick_params(axis="y", labelsize=10)
+    ax.yaxis.set_major_formatter(mticker.FuncFormatter(fmt_mb))
+    ax.grid(axis="y", color="#d9d9d9", linewidth=0.8, alpha=0.8)
+    ax.set_axisbelow(True)
+    ax.spines["top"].set_visible(False)
+    ax.spines["right"].set_visible(False)
+    ax.set_title(title, fontsize=12, fontweight="bold")
+    if ylabel:
+        ax.set_ylabel("Memory (MB)", fontsize=11)
 
-TOP_TTL  = LEG_Y1 + 18           # 80  panel title baseline
-TOP_Y0   = TOP_TTL + 8           # 88  plot top
-TOP_Y1   = TOP_Y0 + 210          # 298 plot bottom
-TOP_XLY  = TOP_Y1 + 16           # 314 x-tick labels
+def plot_lines(ax, datasets, lw=2.0):
+    for data, color in datasets:
+        ts, ms = unzip(data)
+        ax.plot(ts, ms, color=color, linewidth=lw)
 
-ROW_GAP  = 54
-BOT_TTL  = TOP_Y1 + ROW_GAP - 14 # 338 bottom panel title baseline
-BOT_Y0   = TOP_Y1 + ROW_GAP      # 352 bottom plot top
-BOT_Y1   = BOT_Y0 + 210          # 562 bottom plot bottom
-BOT_XLY  = BOT_Y1 + 16           # 578 x-tick labels
+# ── Figure ────────────────────────────────────────────────────────────────────
+fig, axes = plt.subplots(2, 2, figsize=(11, 8))
 
-H        = BOT_XLY + 22          # total height
+# Top row — Apple M4 Pro (ylim 10k)
+plot_lines(axes[0, 0], [(m4c_wllama, WLLAMA), (m4c_webllm, WEBLLM), (m4c_tjs, TJS)])
+style_ax(axes[0, 0], "Apple M4 Pro / Chrome", ylim=10000, ylabel=True)
 
-LX0 = LMARGIN
-LX1 = LMARGIN + PW
-RX0 = LMARGIN + PW + HGAP
-RX1 = LMARGIN + 2*PW + HGAP
+plot_lines(axes[0, 1], [(m4s_wllama, WLLAMA), (m4s_webllm, WEBLLM), (m4s_tjs, TJS)])
+style_ax(axes[0, 1], "Apple M4 Pro / Safari", ylim=10000)
+if oom_pt:
+    tx, ty = oom_pt
+    axes[0, 1].plot(tx, ty, 'x', color=OOM_C, markersize=10, markeredgewidth=2.5, zorder=5)
+    axes[0, 1].annotate("OOM", (tx, ty), xytext=(6, 0),
+                         textcoords="offset points",
+                         va="center", fontsize=10,
+                         color=OOM_C, fontweight="bold")
 
-YMAX   = 12000
-YGRID  = [(0,"0"),(2000,"2k"),(4000,"4k"),
-           (6000,"6k"),(8000,"8k"),(10000,"10k"),(12000,"12k")]
-XTICS     = [0, 5, 10, 15]
-WIN_XTICS = [0, 60, 120, 180, 240, 288]
+# Bottom row — NVIDIA RTX 5080 (ylim 12k)
+plot_lines(axes[1, 0], [(nv_wllama, WLLAMA), (nv_webllm, WEBLLM), (nv_tjs, TJS)])
+style_ax(axes[1, 0], "NVIDIA RTX 5080 (Linux) / Chrome", ylim=12000, ylabel=True)
 
-# ── SVG helpers ────────────────────────────────────────────────────────────────
-def ymap(v, y0, y1): return y1 - (v/YMAX)*(y1-y0)
-def xmap(t, x0, x1, tmax=TMAX): return x0 + (t/tmax)*(x1-x0)
+plot_lines(axes[1, 1], [(win_wllama, WLLAMA), (win_webllm, WEBLLM), (win_tjs, TJS)])
+style_ax(axes[1, 1], "NVIDIA RTX 5080 (Windows) / Chrome", ylim=12000)
 
-def polyline(data, x0, x1, y0, y1, color, sw=2.2, tmax=TMAX):
-    pts = []
-    for t,m in data:
-        x = xmap(t, x0, x1, tmax)
-        y = max(y0, min(y1, ymap(m, y0, y1)))
-        pts.append(f"{x:.1f},{y:.1f}")
-    return (f'<polyline fill="none" stroke="{color}" stroke-width="{sw}" '
-            f'stroke-linejoin="round" points="{" ".join(pts)}"/>\n')
+# Shared x-axis label
+fig.text(0.5, 0.01, "Elapsed time (s)", ha="center", fontsize=12)
 
-def make_ygrid(x0, x1, y0, y1, labels):
-    out = ""
-    for v, lbl in YGRID:
-        y = ymap(v, y0, y1)
-        out += (f'<line x1="{x0}" y1="{y:.1f}" x2="{x1}" y2="{y:.1f}" '
-                f'stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>\n')
-        if labels:
-            out += (f'<text x="{x0-5}" y="{y+4:.1f}" text-anchor="end" '
-                    f'font-size="12" fill="#111" font-family="{FONT}">{lbl}</text>\n')
-    return out
+# Legend (top-left panel)
+legend_handles = [
+    Line2D([0], [0], color=WLLAMA, linewidth=2.5, label="wllama"),
+    Line2D([0], [0], color=WEBLLM, linewidth=2.5, label="WebLLM"),
+    Line2D([0], [0], color=TJS,    linewidth=2.5, label="Transformers.js"),
+]
+axes[0, 0].legend(
+    handles=legend_handles,
+    loc="upper left",
+    frameon=True, facecolor="white",
+    edgecolor="#cfcfcf", framealpha=0.95,
+    fontsize=10,
+)
 
-def make_xgrid(x0, x1, y0, y1, label_y, xtics=XTICS, tmax=TMAX):
-    out = ""
-    n = len(xtics)
-    for i,t in enumerate(xtics):
-        x = xmap(t, x0, x1, tmax)
-        out += (f'<line x1="{x:.1f}" y1="{y0}" x2="{x:.1f}" y2="{y1}" '
-                f'stroke="#ccc" stroke-width="0.8" stroke-dasharray="4,3"/>\n')
-        anc = "start" if i==0 else ("end" if i==n-1 else "middle")
-        out += (f'<text x="{x:.1f}" y="{label_y}" text-anchor="{anc}" '
-                f'font-size="12" fill="#111" font-family="{FONT}">{t}s</text>\n')
-    return out
-
-def axes(x0, x1, y0, y1):
-    return (f'<line x1="{x0}" y1="{y0}" x2="{x0}" y2="{y1}" stroke="#111" stroke-width="1.5"/>\n'
-            f'<line x1="{x0}" y1="{y1}" x2="{x1}" y2="{y1}" stroke="#111" stroke-width="1.5"/>\n')
-
-def title(cx, y, text):
-    return (f'<text x="{cx:.0f}" y="{y}" text-anchor="middle" font-size="14" '
-            f'font-weight="bold" font-family="{FONT}" fill="#111">{text}</text>\n')
-
-def ylabel(cy):
-    return (f'<text transform="rotate(-90)" x="{-cy:.0f}" y="15" text-anchor="middle" '
-            f'font-size="13" font-family="{FONT}" fill="#111" font-weight="bold">Memory (MB)</text>\n')
-
-def oom_marker(x, y0):
-    return (f'<line x1="{x-7:.1f}" y1="{y0+4}" x2="{x+7:.1f}" y2="{y0+18}" '
-            f'stroke="{OOM_C}" stroke-width="2.8"/>\n'
-            f'<line x1="{x+7:.1f}" y1="{y0+4}" x2="{x-7:.1f}" y2="{y0+18}" '
-            f'stroke="{OOM_C}" stroke-width="2.8"/>\n'
-            f'<text x="{x+11:.1f}" y="{y0+18}" font-size="13" fill="{OOM_C}" '
-            f'font-weight="bold" font-family="{FONT}">OOM</text>\n')
-
-# ── Legend ─────────────────────────────────────────────────────────────────────
-LBX, LBW = LMARGIN, 360
-L1Y = LEG_Y0 + 18
-L2Y = LEG_Y0 + 40
-
-def leg_item(lx, ly, color, label, dash=False):
-    d = f' stroke-dasharray="6,3"' if dash else ''
-    return (f'<line x1="{lx}" y1="{ly}" x2="{lx+16}" y2="{ly}" '
-            f'stroke="{color}" stroke-width="3"{d}/>\n'
-            f'<text x="{lx+20}" y="{ly+4}" font-size="13" font-family="{FONT}" '
-            f'fill="#111" font-weight="bold">{label}</text>\n')
-
-oom_x_safari = xmap(oom_t, RX0, RX1)
-
-# ── Build SVG ──────────────────────────────────────────────────────────────────
-svg = f'''<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 {W} {H}" width="{W}" height="{H}">
-<rect width="100%" height="100%" fill="white"/>
-
-<!-- Legend box -->
-<rect x="{LBX}" y="{LEG_Y0}" width="{LBW}" height="{LEG_H}" fill="white" stroke="#888" stroke-width="1" rx="3"/>
-{leg_item(LBX+6,  L1Y, WLLAMA, "wllama")}
-{leg_item(LBX+100,L1Y, WEBLLM, "WebLLM")}
-{leg_item(LBX+210,L1Y, TJS,    "Transformers.js")}
-
-<!-- Y labels -->
-{ylabel((TOP_Y0+TOP_Y1)/2)}
-{ylabel((BOT_Y0+BOT_Y1)/2)}
-
-<!-- TOP LEFT: M4 Pro Chrome -->
-{title((LX0+LX1)/2, TOP_TTL, "Apple M4 Pro / Chrome")}
-{make_ygrid(LX0,LX1,TOP_Y0,TOP_Y1,True)}
-{make_xgrid(LX0,LX1,TOP_Y0,TOP_Y1,TOP_XLY)}
-{axes(LX0,LX1,TOP_Y0,TOP_Y1)}
-{polyline(m4c_tjs,    LX0,LX1,TOP_Y0,TOP_Y1,TJS)}
-{polyline(m4c_webllm, LX0,LX1,TOP_Y0,TOP_Y1,WEBLLM)}
-{polyline(m4c_wllama, LX0,LX1,TOP_Y0,TOP_Y1,WLLAMA)}
-
-<!-- TOP RIGHT: M4 Pro Safari -->
-{title((RX0+RX1)/2, TOP_TTL, "Apple M4 Pro / Safari")}
-{make_ygrid(RX0,RX1,TOP_Y0,TOP_Y1,False)}
-{make_xgrid(RX0,RX1,TOP_Y0,TOP_Y1,TOP_XLY)}
-{axes(RX0,RX1,TOP_Y0,TOP_Y1)}
-{polyline(m4s_tjs,    RX0,RX1,TOP_Y0,TOP_Y1,TJS)}
-{polyline(m4s_webllm, RX0,RX1,TOP_Y0,TOP_Y1,WEBLLM)}
-{polyline(m4s_wllama, RX0,RX1,TOP_Y0,TOP_Y1,WLLAMA)}
-{oom_marker(oom_x_safari, TOP_Y0)}
-
-<!-- BOTTOM LEFT: RTX 5080 Linux Chrome -->
-{title((LX0+LX1)/2, BOT_TTL, "NVIDIA RTX 5080 (Linux) / Chrome")}
-{make_ygrid(LX0,LX1,BOT_Y0,BOT_Y1,True)}
-{make_xgrid(LX0,LX1,BOT_Y0,BOT_Y1,BOT_XLY)}
-{axes(LX0,LX1,BOT_Y0,BOT_Y1)}
-{polyline(nv_tjs,    LX0,LX1,BOT_Y0,BOT_Y1,TJS)}
-{polyline(nv_webllm, LX0,LX1,BOT_Y0,BOT_Y1,WEBLLM)}
-{polyline(nv_wllama, LX0,LX1,BOT_Y0,BOT_Y1,WLLAMA)}
-
-<!-- BOTTOM RIGHT: RTX 5080 Windows Chrome -->
-{title((RX0+RX1)/2, BOT_TTL, "NVIDIA RTX 5080 (Windows) / Chrome")}
-{make_ygrid(RX0,RX1,BOT_Y0,BOT_Y1,False)}
-{make_xgrid(RX0,RX1,BOT_Y0,BOT_Y1,BOT_XLY)}
-{axes(RX0,RX1,BOT_Y0,BOT_Y1)}
-{polyline(win_tjs,    RX0,RX1,BOT_Y0,BOT_Y1,TJS)}
-{polyline(win_webllm, RX0,RX1,BOT_Y0,BOT_Y1,WEBLLM)}
-{polyline(win_wllama, RX0,RX1,BOT_Y0,BOT_Y1,WLLAMA)}
-
-<!-- X axis label -->
-<text x="{(LX0+RX1)/2:.0f}" y="{BOT_XLY+14}" text-anchor="middle" font-size="13"
-      font-family="{FONT}" fill="#111" font-weight="bold">Elapsed time (s)</text>
-</svg>'''
-
-with open(OUT, 'w') as f:
-    f.write(svg)
-print(f"Written {OUT}  ({W}x{H}px)")
+fig.tight_layout(rect=[0, 0.03, 1, 1])
+fig.savefig(OUT, bbox_inches="tight")
+print(f"Written {OUT}")

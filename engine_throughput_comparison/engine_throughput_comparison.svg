@@ -43,14 +43,14 @@
 
 <rect x="84.5" y="196.4" width="26" height="113.6" fill="#009E73" rx="2"/>
 <rect x="115.5" y="104.5" width="26" height="205.5" fill="#56B4E9" rx="2"/>
-<text x="128.5" y="99.5" text-anchor="middle" font-size="11" fill="#1a5c35" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">+81%</text>
+<text x="128.5" y="97.5" text-anchor="middle" font-size="11" fill="#1a5c35" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">+81%</text>
 <rect x="146.5" y="202.6" width="26" height="107.4" fill="#E69F00" rx="2"/>
-<text x="159.5" y="197.6" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-5%</text>
+<text x="159.5" y="195.6" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-5%</text>
 <rect x="225.5" y="291.2" width="26" height="18.8" fill="#009E73" rx="2"/>
 <rect x="256.5" y="243.9" width="26" height="66.1" fill="#56B4E9" rx="2"/>
-<text x="269.5" y="238.9" text-anchor="middle" font-size="11" fill="#1a5c35" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">+251%</text>
+<text x="269.5" y="236.9" text-anchor="middle" font-size="11" fill="#1a5c35" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">+251%</text>
 <rect x="287.5" y="227.6" width="26" height="82.4" fill="#E69F00" rx="2"/>
-<text x="300.5" y="222.6" text-anchor="middle" font-size="11" fill="#1a5c35" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">+338%</text>
+<text x="300.5" y="220.6" text-anchor="middle" font-size="11" fill="#1a5c35" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">+338%</text>
 
 <text x="128" y="328" text-anchor="middle" font-size="14" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">Chrome / fp16</text>
 <text x="270" y="328" text-anchor="middle" font-size="14" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">Safari / fp16</text>
@@ -82,14 +82,14 @@
 
 <rect x="434.5" y="189.2" width="26" height="120.8" fill="#009E73" rx="2"/>
 <rect x="465.5" y="226.7" width="26" height="83.3" fill="#56B4E9" rx="2"/>
-<text x="478.5" y="221.7" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-31%</text>
+<text x="478.5" y="219.7" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-31%</text>
 <rect x="496.5" y="247.7" width="26" height="62.3" fill="#E69F00" rx="2"/>
-<text x="509.5" y="242.7" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-48%</text>
+<text x="509.5" y="240.7" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-48%</text>
 <rect x="575.5" y="212.0" width="26" height="98.0" fill="#009E73" rx="2"/>
 <rect x="606.5" y="239.9" width="26" height="70.1" fill="#56B4E9" rx="2"/>
-<text x="619.5" y="234.9" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-28%</text>
+<text x="619.5" y="232.9" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-28%</text>
 <rect x="637.5" y="273.9" width="26" height="36.1" fill="#E69F00" rx="2"/>
-<text x="650.5" y="268.9" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-63%</text>
+<text x="650.5" y="266.9" text-anchor="middle" font-size="11" fill="#7a1515" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">-63%</text>
 
 <text x="478" y="328" text-anchor="middle" font-size="14" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">Chrome / fp16</text>
 <text x="620" y="328" text-anchor="middle" font-size="14" fill="#111" font-family="Georgia, 'Times New Roman', Times, serif" font-weight="bold">Safari / fp16</text>
