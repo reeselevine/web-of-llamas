@@ -1,0 +1,26 @@
+# Claude
+CLAUDE.local.md
+.claude/
+
+# Paper source (lives in the shared paper repo; kept here only as
+# local context).
+llamas_on_the_web/
+
+# macOS
+.DS_Store
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.egg-info/
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# Editor / OS
+.idea/
+.vscode/
+*.swp
