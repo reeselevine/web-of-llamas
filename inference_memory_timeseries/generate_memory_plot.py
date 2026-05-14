@@ -15,21 +15,20 @@ from matplotlib.lines import Line2D
 OUT = "memory_comparison.pdf"
 
 # ── Paths ─────────────────────────────────────────────────────────────────────
-M4C_TJS    = 'apple_m4_pro_chrome_memory_timeseries/m4_chrome_transformers_fp16.csv'
-M4C_WEBLLM = 'apple_m4_pro_chrome_memory_timeseries/m4_chrome_webllm_fp16.csv'
-M4C_WLLAMA = 'apple_m4_pro_chrome_memory_timeseries/m4_chrome_wllama_fp16.csv'
-M4S_TJS    = 'apple_m4_pro_safari_memory_timeseries/m4_safari_transformers_fp16.csv'   # total_mb
-M4S_WEBLLM = 'apple_m4_pro_safari_memory_timeseries/m4_safari_webllm_fp16.csv'         # total_mb
-M4S_WLLAMA = 'apple_m4_pro_safari_memory_timeseries/m4_safari_wllama_fp16.csv'         # total_mb
-NV_TJS     = 'linux_nvidia_rtx5080_chrome_memory_timeseries/5080_linux_transformers_q4f16_csv.csv'
-NV_WEBLLM  = 'linux_nvidia_rtx5080_chrome_memory_timeseries/5080_linux_webllm_q4f16_1.csv'
-NV_WLLAMA  = 'linux_nvidia_rtx5080_chrome_memory_timeseries/5080_linux_wllama_q4_k_m.csv'
+M4C_TJS    = 'apple_m4_pro_chrome_memory_timeseries/transformers_fp16.csv'
+M4C_WEBLLM = 'apple_m4_pro_chrome_memory_timeseries/webllm_fp16.csv'
+M4C_WLLAMA = 'apple_m4_pro_chrome_memory_timeseries/wllama_fp16.csv'
+M4S_TJS    = 'apple_m4_pro_safari_memory_timeseries/transformers_fp16.csv'  # total_mb (OOM)
+M4S_WEBLLM = 'apple_m4_pro_safari_memory_timeseries/webllm_fp16.csv'          # total_mb
+M4S_WLLAMA = 'apple_m4_pro_safari_memory_timeseries/wllama_fp16.csv'          # total_mb
+NV_TJS     = 'linux_nvidia_rtx5080_chrome_memory_timeseries/5080_linux_transformers_fp16.csv'
+NV_WEBLLM  = 'linux_nvidia_rtx5080_chrome_memory_timeseries/5080_linux_webllm_q0f16.csv'
+NV_WLLAMA  = 'linux_nvidia_rtx5080_chrome_memory_timeseries/5080_linux_wllama_fp16.csv'
 WIN_TJS    = 'windows_nvidia_rtx5080_chrome_timeseries/transformers_fp16_win.csv'
 WIN_WEBLLM = 'windows_nvidia_rtx5080_chrome_timeseries/webllm_q0f16_win.csv'
 WIN_WLLAMA = 'windows_nvidia_rtx5080_chrome_timeseries/wllama_fp16_win.csv'
 
-TMAX     = 15
-WIN_TMAX = 15
+TMAX = 30
 
 # ── Colors ────────────────────────────────────────────────────────────────────
 WLLAMA = "#009E73"
@@ -38,17 +37,22 @@ TJS    = "#E69F00"
 OOM_C  = "#D55E00"
 
 # ── Data loading ──────────────────────────────────────────────────────────────
-def read_csv(path, mem_col='combined_mb', tmax=TMAX):
+def read_csv(path, mem_col='combined_mb', tmax=TMAX, trim_start=None, trim_to_steady=False):
     rows = []
     with open(path) as f:
         for r in csv.DictReader(f):
             t = datetime.fromisoformat(r['timestamp'])
             rows.append((t, float(r[mem_col])))
+    if trim_start is not None:
+        rows = list(itertools.dropwhile(lambda x: x[1] < trim_start, rows))
+    if trim_to_steady:
+        peak_idx = max(range(len(rows)), key=lambda i: rows[i][1])
+        rows = rows[peak_idx + 1:]
     t0 = rows[0][0]
     return [((t - t0).total_seconds(), m) for t, m in rows
             if (t - t0).total_seconds() <= tmax]
 
-def read_csv_windows(path, tmax=TMAX, trim_start=None, trim_to_steady=False):
+def read_csv_windows(path, tmax=TMAX, trim_start=None, trim_to_steady=False, start_time=None):
     """Windows CSV: combined_mb = sum(*_priv_mb) + gpu_vram_mb."""
     rows = []
     with open(path) as f:
@@ -57,6 +61,9 @@ def read_csv_windows(path, tmax=TMAX, trim_start=None, trim_to_steady=False):
             priv = sum(float(v) for k, v in r.items() if k.endswith('_priv_mb'))
             combined = priv + float(r['gpu_vram_mb'])
             rows.append((t, combined))
+    if start_time is not None:
+        cutoff = datetime.fromisoformat(start_time)
+        rows = [(t, m) for t, m in rows if t >= cutoff]
     if trim_start is not None:
         rows = list(itertools.dropwhile(lambda x: x[1] < trim_start, rows))
     if trim_to_steady:
@@ -82,15 +89,15 @@ m4c_wllama = read_csv(M4C_WLLAMA)
 m4s_tjs_raw = read_csv(M4S_TJS, mem_col='total_mb')
 m4s_webllm  = read_csv(M4S_WEBLLM, mem_col='total_mb')
 m4s_wllama  = read_csv(M4S_WLLAMA, mem_col='total_mb')
-nv_tjs     = read_csv(NV_TJS)
-nv_webllm  = read_csv(NV_WEBLLM)
-nv_wllama  = read_csv(NV_WLLAMA)
+m4s_tjs, _ = split_oom(m4s_tjs_raw)
+oom_pt = m4s_tjs[-1] if m4s_tjs else None
+nv_tjs     = read_csv(NV_TJS, trim_start=6300)
+nv_webllm  = read_csv(NV_WEBLLM, trim_start=6050)
+nv_wllama  = read_csv(NV_WLLAMA, trim_start=400, trim_to_steady=True)
 win_tjs    = read_csv_windows(WIN_TJS)
-win_webllm = read_csv_windows(WIN_WEBLLM, trim_start=1000, trim_to_steady=True)
+win_webllm = read_csv_windows(WIN_WEBLLM, start_time='2026-05-12 14:19:21')
 win_wllama = read_csv_windows(WIN_WLLAMA)
 
-m4s_tjs, _ = split_oom(m4s_tjs_raw)
-oom_pt = m4s_tjs[-1] if m4s_tjs else None   # (t, m) where line ends
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 def unzip(data):
@@ -101,11 +108,12 @@ def fmt_mb(v, _):
         return f"{int(v / 1000)}k" if v % 1000 == 0 else f"{v / 1000:.0f}k"
     return str(int(v))
 
-def style_ax(ax, title, ylim, ylabel=False):
-    ax.set_xlim(0, TMAX)
+def style_ax(ax, title, ylim, ylabel=False, tmax=TMAX):
+    ax.set_xlim(0, tmax)
     ax.set_ylim(0, ylim)
-    ax.set_xticks([0, 5, 10, 15])
-    ax.set_xticklabels(["0s", "5s", "10s", "15s"], fontsize=18)
+    ticks = [0, 10, 20, 30]
+    ax.set_xticks(ticks)
+    ax.set_xticklabels([f"{t}s" for t in ticks], fontsize=18)
     ax.tick_params(axis="y", labelsize=18)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(fmt_mb))
     ax.grid(axis="y", color="#d9d9d9", linewidth=0.8, alpha=0.8)
