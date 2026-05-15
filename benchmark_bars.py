@@ -7,10 +7,10 @@ from matplotlib.ticker import FuncFormatter
 
 
 devices = [
-    "NVIDIA RTX 5080",
-    "AMD 7900 XT",
-    "Intel B580",
-    "Apple M4 Pro",
+    "NVIDIA\nRTX 5080",
+    "AMD\nRX 7900 XT",
+    "Intel\nArc B580",
+    "Apple\nM4 Pro",
 ]
 
 device_order = [0, 2, 1, 3]
@@ -152,16 +152,16 @@ def plot_metric(metric):
                 rotation=90,
                 ha="center",
                 va="bottom",
-                fontsize=12,
+                fontsize=14,
                 color="#666666",
             )
 
-    ax.set_ylabel(metric["ylabel"], fontsize=20)
+    ax.set_ylabel(metric["ylabel"], fontsize=22)
     ax.set_xticks(x)
-    ax.set_xticklabels(devices, fontsize=18)
+    ax.set_xticklabels(devices, fontsize=20)
     ax.set_ylim(0, max_value * 1.12)
     ax.yaxis.set_major_formatter(FuncFormatter(format_tokens_per_second))
-    ax.tick_params(axis="y", labelsize=18)
+    ax.tick_params(axis="y", labelsize=20)
     ax.grid(axis="y", color="#d9d9d9", linewidth=0.8, alpha=0.8)
     ax.set_axisbelow(True)
 
@@ -177,30 +177,30 @@ def plot_metric(metric):
 
         backend_legend = ax.legend(
             loc="center left",
-            bbox_to_anchor=(0.65, 0.78),
+            bbox_to_anchor=(0.4, 0.74),
             ncol=1,
             frameon=True,
             facecolor="white",
             edgecolor="#cfcfcf",
             framealpha=0.95,
-            fontsize=16,
+            fontsize=18,
             title="Backend",
-            title_fontsize=16,
+            title_fontsize=18,
             handles=backend_handles,
         )
         ax.add_artist(backend_legend)
 
         quant_legend = ax.legend(
             loc="center left",
-            bbox_to_anchor=(0.65, 0.4),
+            bbox_to_anchor=(0.82, 0.84),
             ncol=1,
             frameon=True,
             facecolor="white",
             edgecolor="#cfcfcf",
             framealpha=0.95,
-            fontsize=16,
+            fontsize=18,
             title="Weight Format",
-            title_fontsize=16,
+            title_fontsize=18,
             handles=quant_handles,
         )
         quant_legend._legend_box.align = "left"

@@ -114,6 +114,7 @@ def style_ax(ax, title, ylim, ylabel=False, tmax=TMAX):
     ticks = [0, 10, 20, 30]
     ax.set_xticks(ticks)
     ax.set_xticklabels([f"{t}s" for t in ticks], fontsize=22)
+    ax.set_yticks([5000, 10000])
     ax.tick_params(axis="y", labelsize=22)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(fmt_mb))
     ax.grid(axis="y", color="#d9d9d9", linewidth=0.8, alpha=0.8)
