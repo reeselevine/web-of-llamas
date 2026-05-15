@@ -120,7 +120,11 @@ def chrome_unless_only_safari(records_for_device):
 
 
 def load_filtered(runs_dir):
-    """Return list of records (one per benchmark, post-browser-preference)."""
+    """Return one record per (device, model). When multiple JSON records
+    cover the same cell, keep the one with the highest nReps; tiebreak
+    on the latest timestamp. d0-only and d2048-only records are deduped
+    independently (each cell gets one d0 record and one d2048 record),
+    then merged into a single record with all four metrics."""
     import glob, json
     raw = []
     for fp in sorted(glob.glob(os.path.join(runs_dir, "**/*.json"),
@@ -156,15 +160,71 @@ def load_filtered(runs_dir):
                 "label": label,
                 "model": rec.get("model"),
                 "browser": (rec.get("browser") or "").lower(),
+                "nReps": rec.get("nReps") or 0,
+                "timestamp": rec.get("timestamp") or "",
                 "metric": metric,
             })
 
     by_device = defaultdict(list)
     for r in raw:
         by_device[r["label"]].append(r)
-    out = []
+    browser_filtered = []
     for recs in by_device.values():
-        out.extend(chrome_unless_only_safari(recs))
+        browser_filtered.extend(chrome_unless_only_safari(recs))
+
+    return _dedup_one_per_cell(browser_filtered)
+
+
+def _dedup_one_per_cell(records, cell_key=None):
+    """Keep one record per cell + depth-class. Depth class is derived
+    from which metric keys the record populates — d0 and d2048 results
+    live in separate records in the JSON archive. After picking one
+    record per class (highest nReps; tiebreak latest timestamp), merge
+    the two into a single record with both depths' metrics populated.
+
+    cell_key defaults to (label, family, model) for the portability
+    study; pass a different callable to dedup by (device, variant) or
+    any other grouping."""
+    if cell_key is None:
+        cell_key = lambda r: (r["label"], r["family"], r["model"])
+
+    d0_keys = ("pp512_d0", "tg128_d0")
+    d2k_keys = ("pp512_d2048", "tg128_d2048")
+
+    def depth_class(rec):
+        m = rec["metric"]
+        has_d0 = any(m.get(k) is not None for k in d0_keys)
+        has_d2k = any(m.get(k) is not None for k in d2k_keys)
+        if has_d0 and not has_d2k:
+            return "d0"
+        if has_d2k and not has_d0:
+            return "d2k"
+        return None
+
+    by_cell = defaultdict(lambda: defaultdict(list))
+    for r in records:
+        cls = depth_class(r)
+        if cls is None:
+            continue
+        by_cell[cell_key(r)][cls].append(r)
+
+    out = []
+    for key, by_class in by_cell.items():
+        merged_metric = {"pp512_d0": None, "tg128_d0": None,
+                         "pp512_d2048": None, "tg128_d2048": None}
+        template = None
+        for cls, recs in by_class.items():
+            recs.sort(key=lambda r: (r["nReps"], r["timestamp"]),
+                      reverse=True)
+            chosen = recs[0]
+            keys = d0_keys if cls == "d0" else d2k_keys
+            for k in keys:
+                merged_metric[k] = chosen["metric"].get(k)
+            template = template or chosen
+        new_rec = {k: v for k, v in template.items()
+                   if k not in ("metric", "nReps", "timestamp")}
+        new_rec["metric"] = merged_metric
+        out.append(new_rec)
     return out
 
 
