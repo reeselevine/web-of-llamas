@@ -24,14 +24,13 @@ NEG_PCT = "#7a1515"
 # ── Data ──────────────────────────────────────────────────────────────────────
 # (label, wllama_pre, wllama_dec, webllm_pre, webllm_dec, tjs_pre, tjs_dec)
 groups = [
-    ("M4 Pro\nChrome",      1010.5, 74.2,  1828.2, 51.2,  955.3,  38.3),
-    ("M4 Pro\nSafari",      167.5,  60.2,   588.4, 43.1,  732.9,  22.2),
-    ("M4 / Chrome / q4",    611.5, 110.0,  1832.3, 68.1,  959.3, 124.4),  # not plotted
-    ("M4 / Safari / q4",    152.5,  63.0,   501.5, 62.0,  634.8,  50.3),  # not plotted
-    ("RTX 5080\nLinux",    1170.9, 103.1,  1922.2, 69.2, 1534.0,  66.2),
-    ("RTX 5080\nWindows",  1300.8,  96.6,  2759.9, 50.7, 1763.2,  41.7),
+    ("Apple\nM4 Pro",         1010.5, 74.2,  1828.2, 51.2,  955.3,  38.3),
+    # ("RTX 5080\nLinux",    1170.9, 103.1,  1922.2, 69.2, 1534.0,  66.2),
+    ("NVIDIA\nRTX 5080",  1300.8,  96.6,  2759.9, 50.7, 1763.2,  41.7),
+    ("Intel\nArc B580",  644.9,  42.1,  1467, 40.1, 1205.5,  38.5),
+    ("AMD\nRX 9700 XT",  1228.8,  71.3,  2552.8, 35.9, 1343.2,  43.2)
 ]
-plot_groups = [g for g in groups if "q4" not in g[0]]
+plot_groups = groups
 
 engines = ["wllama", "WebLLM", "Transformers.js"]
 clrs    = [WLLAMA, WEBLLM, TJS]
@@ -43,7 +42,7 @@ def fmt_tps(v, _):
     return f"{int(v)}" if v == int(v) else f"{v:.0f}"
 
 # ── Figure ────────────────────────────────────────────────────────────────────
-fig, axes = plt.subplots(1, 2, figsize=(14, 6.2))
+fig, axes = plt.subplots(2, 1, figsize=(10, 11))
 
 x     = np.arange(len(plot_groups))
 NB    = 3
@@ -54,6 +53,7 @@ for ax, pidx, title in [
     (axes[0], 0, "Prefill"),
     (axes[1], 1, "Decode"),
 ]:
+    ax.set_ylabel("tokens / second", fontsize=30)
     # engine_vals[bi][gi] = value for engine bi, group gi
     engine_vals = [
         [row[1 + pidx + 2 * bi] for row in plot_groups]
@@ -103,15 +103,15 @@ for ax, pidx, title in [
                 x[gi] + offs[bi], label_ys[bi],
                 f"{sign}{pct:.0f}%",
                 ha="center", va="bottom",
-                fontsize=12, color=col, fontweight="bold", zorder=4,
+                fontsize=17, color=col, fontweight="bold", zorder=4,
             )
 
-    ax.set_title(title, fontsize=24, fontweight="bold", pad=12)
+    ax._pending_title = title
     ax.set_xticks(x)
-    ax.set_xticklabels([g[0] for g in plot_groups], fontsize=19, rotation=0, ha='center')
-    ax.tick_params(axis="y", labelsize=18)
+    ax.set_xticklabels([g[0] for g in plot_groups], fontsize=25, rotation=0, ha='center')
+    ax.tick_params(axis="y", labelsize=28)
+    ax.set_xlim(-0.6, len(plot_groups) - 0.4)
     ax.yaxis.set_major_locator(mticker.MaxNLocator(nbins=7))
-    ax.set_ylabel("tok / s", fontsize=20)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(fmt_tps))
     ax.grid(axis="y", color="#d9d9d9", linewidth=0.8, alpha=0.8)
     ax.set_axisbelow(True)
@@ -119,16 +119,27 @@ for ax, pidx, title in [
     ax.spines["right"].set_visible(False)
 
 handles, labels = axes[0].get_legend_handles_labels()
+
 fig.legend(
     handles, labels,
-    loc="lower center",
+    loc="upper center",
     ncol=3,
-    bbox_to_anchor=(0.5, -0.02),
+    bbox_to_anchor=(0.5, 1.0),
     frameon=True, facecolor="white",
     edgecolor="#cfcfcf", framealpha=0.95,
-    fontsize=16,
+    fontsize=26,
 )
 
-fig.tight_layout(rect=[0, 0.1, 1, 1])
+fig.tight_layout(rect=[0, 0, 1, 0.88])
+
+pos = axes[1].get_position()
+axes[1].set_position([pos.x0, pos.y0 - 0.08, pos.width, pos.height])
+
+for ax, y_off in zip(axes, [0.01, 0.01]):
+    bbox = ax.get_position()
+    fig.text(0.5, bbox.y1 + y_off, ax._pending_title,
+             ha="center", va="bottom", fontsize=36, fontweight="bold",
+             transform=fig.transFigure)
+
 fig.savefig(OUT, bbox_inches="tight")
 print(f"Written {OUT}")

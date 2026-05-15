@@ -113,16 +113,16 @@ def style_ax(ax, title, ylim, ylabel=False, tmax=TMAX):
     ax.set_ylim(0, ylim)
     ticks = [0, 10, 20, 30]
     ax.set_xticks(ticks)
-    ax.set_xticklabels([f"{t}s" for t in ticks], fontsize=18)
-    ax.tick_params(axis="y", labelsize=18)
+    ax.set_xticklabels([f"{t}s" for t in ticks], fontsize=22)
+    ax.tick_params(axis="y", labelsize=22)
     ax.yaxis.set_major_formatter(mticker.FuncFormatter(fmt_mb))
     ax.grid(axis="y", color="#d9d9d9", linewidth=0.8, alpha=0.8)
     ax.set_axisbelow(True)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.set_title(title, fontsize=20, fontweight="bold")
+    ax.set_title(title, fontsize=24, fontweight="bold")
     if ylabel:
-        ax.set_ylabel("Memory (MB)", fontsize=20)
+        ax.set_ylabel("Memory (MB)", fontsize=24)
 
 def plot_lines(ax, datasets, lw=2.0):
     for data, color in datasets:
@@ -143,7 +143,7 @@ if oom_pt:
     axes[0, 1].plot(tx, ty, 'x', color=OOM_C, markersize=10, markeredgewidth=2.5, zorder=5)
     axes[0, 1].annotate("OOM", (tx, ty), xytext=(6, 0),
                          textcoords="offset points",
-                         va="center", fontsize=16,
+                         va="center", fontsize=20,
                          color=OOM_C, fontweight="bold")
 
 # Bottom row — NVIDIA RTX 5080 (ylim 12k)
@@ -154,9 +154,9 @@ plot_lines(axes[1, 1], [(win_wllama, WLLAMA), (win_webllm, WEBLLM), (win_tjs, TJ
 style_ax(axes[1, 1], "NVIDIA RTX 5080 (Windows)\nChrome", ylim=12000)
 
 # Shared x-axis label
-fig.text(0.5, 0.0, "Elapsed time (s)", ha="center", fontsize=20)
+fig.text(0.5, 0.0, "Elapsed time (s)", ha="center", fontsize=24)
 
-# Legend below all panels
+# Legend above all panels
 legend_handles = [
     Line2D([0], [0], color=WLLAMA, linewidth=2.5, label="wllama"),
     Line2D([0], [0], color=WEBLLM, linewidth=2.5, label="WebLLM"),
@@ -164,14 +164,14 @@ legend_handles = [
 ]
 fig.legend(
     handles=legend_handles,
-    loc="lower center",
+    loc="upper center",
     ncol=3,
-    bbox_to_anchor=(0.5, 0.02),
+    bbox_to_anchor=(0.5, 1.0),
     frameon=True, facecolor="white",
     edgecolor="#cfcfcf", framealpha=0.95,
-    fontsize=16,
+    fontsize=20,
 )
 
-fig.tight_layout(rect=[0, 0.08, 1, 1])
+fig.tight_layout(rect=[0, 0.04, 1, 0.93])
 fig.savefig(OUT, bbox_inches="tight")
 print(f"Written {OUT}")
