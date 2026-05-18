@@ -1,0 +1,83 @@
+Cluster	Cluster A	Phase	Prefill	KV depth	0
+Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
+Q2_K	1.00x	0.79x	0.74x	0.59x
+Q4_K_M		1.00x	0.93x	0.75x
+Q8_0			1.00x	0.80x
+F16				1.00x
+
+Cluster	Cluster A	Phase	Prefill	KV depth	2048
+Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
+Q2_K	1.00x	0.83x	0.79x	0.62x
+Q4_K_M		1.00x	0.95x	0.75x
+Q8_0			1.00x	0.79x
+F16				1.00x
+
+Cluster	Cluster A	Phase	Decode	KV depth	0
+Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
+Q2_K	1.00x	0.80x	0.81x	0.98x
+Q4_K_M		1.00x	1.01x	1.23x
+Q8_0			1.00x	1.21x
+F16				1.00x
+
+Cluster	Cluster A	Phase	Decode	KV depth	2048
+Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
+Q2_K	1.00x	0.95x	1.00x	1.18x
+Q4_K_M		1.00x	1.05x	1.25x
+Q8_0			1.00x	1.19x
+F16				1.00x
+
+Cluster	Cluster B	Phase	Prefill	KV depth	0
+Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
+Q2_K	1.00x	0.63x	0.49x	0.40x
+Q4_K_M		1.00x	0.78x	0.64x
+Q8_0			1.00x	0.82x
+F16				1.00x
+
+Cluster	Cluster B	Phase	Prefill	KV depth	2048
+Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
+Q2_K	1.00x	0.70x	0.57x	0.49x
+Q4_K_M		1.00x	0.81x	0.69x
+Q8_0			1.00x	0.85x
+F16				1.00x
+
+Cluster	Cluster B	Phase	Decode	KV depth	0
+Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
+Q2_K	1.00x	0.85x	0.91x	1.33x
+Q4_K_M		1.00x	1.07x	1.56x
+Q8_0			1.00x	1.46x
+F16				1.00x
+
+Cluster	Cluster B	Phase	Decode	KV depth	2048
+Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
+Q2_K	1.00x	0.92x	0.97x	1.34x
+Q4_K_M		1.00x	1.06x	1.47x
+Q8_0			1.00x	1.38x
+F16				1.00x
+
+Cluster	Cluster C	Phase	Prefill	KV depth	0
+Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
+Q2_K	1.00x	0.76x	0.75x	0.87x
+Q4_K_M		1.00x	0.98x	1.14x
+Q8_0			1.00x	1.16x
+F16				1.00x
+
+Cluster	Cluster C	Phase	Prefill	KV depth	2048
+Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
+Q2_K	1.00x	0.51x	0.51x	0.63x
+Q4_K_M		1.00x	0.99x	1.22x
+Q8_0			1.00x	1.23x
+F16				1.00x
+
+Cluster	Cluster C	Phase	Decode	KV depth	0
+Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
+Q2_K	1.00x	0.99x	1.05x	2.89x
+Q4_K_M		1.00x	1.05x	2.91x
+Q8_0			1.00x	2.76x
+F16				1.00x
+
+Cluster	Cluster C	Phase	Decode	KV depth	2048
+Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
+Q2_K	1.00x	0.49x	0.53x	1.33x
+Q4_K_M		1.00x	1.08x	2.74x
+Q8_0			1.00x	2.54x
+F16				1.00x

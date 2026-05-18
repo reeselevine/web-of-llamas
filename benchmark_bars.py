@@ -124,11 +124,16 @@ def plot_metric(metric):
     x = np.arange(len(devices))
     bar_width = 0.095
     offsets = (np.arange(len(series)) - (len(series) - 1) / 2) * bar_width
+    has_legend = metric["show_legend"]
 
-    fig, ax = plt.subplots(figsize=(10.5, 4.6))
+    fig_height = 6.2 if has_legend else 4.6
+    fig, ax = plt.subplots(figsize=(10.5, fig_height))
 
-    max_value = np.nanmax(metric["values"])
-    na_y = max_value * 0.015
+    values_array = np.array(metric["values"], dtype=float)
+    max_value = np.nanmax(values_array)
+    min_positive_value = np.nanmin(values_array[values_array > 0])
+    y_min = 10 ** np.floor(np.log10(min_positive_value))
+    na_y = y_min * 1.15
 
     for idx, ((quant, backend), values) in enumerate(zip(series, metric["values"])):
         values = np.array(values, dtype=float)[device_order]
@@ -159,26 +164,29 @@ def plot_metric(metric):
     ax.set_ylabel(metric["ylabel"], fontsize=22)
     ax.set_xticks(x)
     ax.set_xticklabels(devices, fontsize=20)
-    ax.set_ylim(0, max_value * 1.12)
+    ax.set_yscale("log")
+    ax.set_ylim(y_min, max_value * 1.12)
     ax.yaxis.set_major_formatter(FuncFormatter(format_tokens_per_second))
     ax.tick_params(axis="y", labelsize=20)
     ax.grid(axis="y", color="#d9d9d9", linewidth=0.8, alpha=0.8)
     ax.set_axisbelow(True)
 
-    if metric["show_legend"]:
+    extra_artists = []
+
+    if has_legend:
         backend_handles = [
             Patch(facecolor=colors[name], edgecolor="#2f2f2f", label=name)
             for name in colors
         ]
         quant_handles = [
-            Patch(facecolor="white", edgecolor="#2f2f2f", hatch=hatches["q4_k_m"], label="q4_k"),
+            Patch(facecolor="white", edgecolor="#2f2f2f", hatch=hatches["q4_k_m"], label="q4_k_m"),
             Patch(facecolor="white", edgecolor="#2f2f2f", hatch=hatches["f16"], label="f16"),
         ]
 
         backend_legend = ax.legend(
-            loc="center left",
-            bbox_to_anchor=(0.4, 0.74),
-            ncol=1,
+            loc="lower center",
+            bbox_to_anchor=(0.42, 1.02),
+            ncol=2,
             frameon=True,
             facecolor="white",
             edgecolor="#cfcfcf",
@@ -188,11 +196,13 @@ def plot_metric(metric):
             title_fontsize=18,
             handles=backend_handles,
         )
+        backend_legend.set_in_layout(False)
         ax.add_artist(backend_legend)
+        extra_artists.append(backend_legend)
 
         quant_legend = ax.legend(
-            loc="center left",
-            bbox_to_anchor=(0.82, 0.84),
+            loc="lower center",
+            bbox_to_anchor=(0.88, 1.02),
             ncol=1,
             frameon=True,
             facecolor="white",
@@ -203,13 +213,21 @@ def plot_metric(metric):
             title_fontsize=18,
             handles=quant_handles,
         )
+        quant_legend.set_in_layout(False)
         quant_legend._legend_box.align = "left"
+        extra_artists.append(quant_legend)
 
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
 
     fig.tight_layout()
-    fig.savefig(f"{metric['output_stem']}.pdf", bbox_inches="tight")
+    if has_legend:
+        fig.subplots_adjust(top=0.78)
+    fig.savefig(
+        f"{metric['output_stem']}.pdf",
+        bbox_inches="tight",
+        bbox_extra_artists=extra_artists,
+    )
 
 
 def main():

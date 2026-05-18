@@ -159,7 +159,7 @@ fig.text(0.5, 0.0, "Elapsed time (s)", ha="center", fontsize=24)
 
 # Legend above all panels
 legend_handles = [
-    Line2D([0], [0], color=WLLAMA, linewidth=2.5, label="wllama"),
+    Line2D([0], [0], color=WLLAMA, linewidth=2.5, label="LlamaWeb"),
     Line2D([0], [0], color=WEBLLM, linewidth=2.5, label="WebLLM"),
     Line2D([0], [0], color=TJS,    linewidth=2.5, label="Transformers.js"),
 ]

@@ -1,0 +1,13 @@
+Cluster	Phase	KV depth	Q2_K	Q4_K_M	Q8_0	F16
+Cluster A	Prefill	0	911.03	1146.79	1235.41	1537.52
+Cluster A	Prefill	2048	775.30	934.34	985.07	1243.44
+Cluster A	Decode	0	77.86	97.03	95.73	79.20
+Cluster A	Decode	2048	88.46	93.56	88.84	74.95
+Cluster B	Prefill	0	103.21	164.47	210.62	255.85
+Cluster B	Prefill	2048	85.46	121.39	150.22	175.94
+Cluster B	Decode	0	26.98	31.73	29.64	20.29
+Cluster B	Decode	2048	24.32	26.54	24.95	18.09
+Cluster C	Prefill	0	37.70	49.34	50.36	43.44
+Cluster C	Prefill	2048	27.25	53.36	53.73	43.59
+Cluster C	Decode	0	4.46	4.48	4.25	1.54
+Cluster C	Decode	2048	2.00	4.11	3.81	1.50
