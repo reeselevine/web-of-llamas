@@ -33,7 +33,7 @@ groups = [
 ]
 plot_groups = groups
 
-engines = ["wllama", "WebLLM", "Transformers.js"]
+engines = ["LlamaWeb", "WebLLM", "Transformers.js"]
 clrs    = [WLLAMA, WEBLLM, TJS]
 
 # ── Y-axis formatter ──────────────────────────────────────────────────────────
@@ -43,7 +43,7 @@ def fmt_tps(v, _):
     return f"{int(v)}" if v == int(v) else f"{v:.0f}"
 
 def plot_metric(kind, pidx):
-    fig, ax = plt.subplots(figsize=(10, 5.1))
+    fig, ax = plt.subplots(figsize=(10, 4.5))
 
     x = np.arange(len(plot_groups))
     NB = 3

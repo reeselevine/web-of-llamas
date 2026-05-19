@@ -226,7 +226,8 @@ PANEL_KEYS = [
 
 
 def plot_panel_per_device(per_device, model_id, key_d0, key_d2k, output_path,
-                          with_legend=True, legend_families=None):
+                          with_legend=True, legend_families=None,
+                          reserve_legend_space=False):
     """Single-panel per-device figure for one (model, phase) pair.
 
     Style follows CLAUDE.md (log y, no title, larger fonts).
@@ -253,7 +254,12 @@ def plot_panel_per_device(per_device, model_id, key_d0, key_d2k, output_path,
     families = [info["family"] for _, info in items]
     metrics_per_dev = [info["metrics"] for _, info in items]
 
-    fig, ax = plt.subplots(figsize=(15.5, 5.0))
+    if with_legend or reserve_legend_space:
+        fig, ax = plt.subplots(figsize=(15.5, 5.8))
+        fig.subplots_adjust(left=0.08, right=0.995, bottom=0.22, top=0.84)
+    else:
+        fig, ax = plt.subplots(figsize=(15.5, 5.0))
+        fig.subplots_adjust(left=0.08, right=0.995, bottom=0.22, top=0.98)
     bar_width = 0.38
     x = np.arange(len(labels))
 
@@ -369,7 +375,6 @@ def plot_panel_per_device(per_device, model_id, key_d0, key_d2k, output_path,
         _center_legend_pair(ax, leg_fam, leg_kv)
         extras = [leg_fam, leg_kv]
 
-    fig.tight_layout()
     # bbox_extra_artists ensures the tight bounding-box calculation
     # includes the legends, whose titles otherwise sit just above the
     # saved area and get visually clipped at the top edge.
@@ -398,26 +403,17 @@ def main():
         print(f"Wrote {out}")
 
     # App-B (one PDF per (model, phase) for subfigure composition).
-    # Each figure-page in the paper groups 5 models into a 5-row 2-col
-    # tabular (prefill left, decode right). Within a page the legend
-    # would be identical, so it's drawn on the first model's prefill
-    # only, using a master legend that covers the union of device
-    # families across every panel on the page. All other panels (other
-    # models' prefill, plus every decode) get no legend.
-    FIGURE_GROUPS = [
-        [mid for mid, _ in MODEL_ORDER[:5]],   # part 1 of 2
-        [mid for mid, _ in MODEL_ORDER[5:]],   # part 2 of 2
-    ]
-    page_master_family = {}  # model_id -> set of families for its page's legend
-    page_first_model = set()
-    for group in FIGURE_GROUPS:
-        union = set()
-        for mid in group:
-            for label, info in per_device.get(mid, {}).items():
-                if info.get("family"):
-                    union.add(info["family"])
-        page_master_family[group[0]] = union
-        page_first_model.add(group[0])
+    # Use one master legend for the entire appendix device-bar section:
+    # the first portability panel (lfm prefill). Its paired decode
+    # panel reserves the same top whitespace so the two subfigures
+    # align vertically when placed side-by-side. Every later appendix
+    # panel carries no legend.
+    first_model = MODEL_ORDER[0][0]
+    master_families = set()
+    for mid, _disp in MODEL_ORDER:
+        for _label, info in per_device.get(mid, {}).items():
+            if info.get("family"):
+                master_families.add(info["family"])
 
     for mid, _disp in MODEL_ORDER:
         for slug, key_d0, key_d2k in PANEL_KEYS:
@@ -425,11 +421,13 @@ def main():
                 OUT_DIR,
                 f"portability_appendix_{slugify(mid)}_{slug}.pdf",
             )
-            show_legend = (slug == "prefill") and (mid in page_first_model)
-            master = page_master_family.get(mid) if show_legend else None
+            show_legend = (slug == "prefill") and (mid == first_model)
+            reserve_space = (mid == first_model)
+            master = master_families if show_legend else None
             ok = plot_panel_per_device(
                 per_device, mid, key_d0, key_d2k, out,
                 with_legend=show_legend, legend_families=master,
+                reserve_legend_space=reserve_space,
             )
             if ok:
                 print(f"Wrote {out}")

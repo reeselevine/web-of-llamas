@@ -57,29 +57,20 @@ def main():
                       x_order=VARIANT_ORDER, rotate_xticks=False)
         print(f"Wrote {out}")
 
-    # App-B (one PDF per (variant, phase)). All four variants live on
-    # one figure-page in the paper; the legend would be identical
-    # across them, so it's drawn on the first variant's prefill only,
-    # using a master legend that covers every family that appears in
-    # any variant. Every other panel gets no legend.
-    first_variant = VARIANT_ORDER[0][0]
-    master_families = set()
-    for variant, _ in VARIANT_ORDER:
-        for _label, info in per_device.get(variant, {}).items():
-            if info.get("family"):
-                master_families.add(info["family"])
-
+    # App-B (one PDF per (variant, phase)). These panels reuse the
+    # single appendix legend shown on the first portability prefill
+    # figure, so none of the quantization appendix panels render their
+    # own legend.
     for variant, _disp in VARIANT_ORDER:
         for slug, key_d0, key_d2k in PANELS:
             out = os.path.join(
                 OUT_DIR,
                 f"quantization_appendix_{slugify(variant)}_{slug}.pdf",
             )
-            show_legend = (slug == "prefill") and (variant == first_variant)
-            master = master_families if show_legend else None
             ok = plot_panel_per_device(
                 per_device, variant, key_d0, key_d2k, out,
-                with_legend=show_legend, legend_families=master,
+                with_legend=False, legend_families=None,
+                reserve_legend_space=False,
             )
             if ok:
                 print(f"Wrote {out}")
