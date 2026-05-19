@@ -268,7 +268,7 @@ def _center_legend_pair(ax, leg_left, leg_right, center=0.5, gap=0.01):
 def draw_panel(ax, agg, key_d0, key_d2k,
                bucket_order, bucket_colors, legend_title,
                *, x_order=None, with_legend=True, with_xticklabels=True,
-               rotate_xticks=True):
+               rotate_xticks=True, compact_legend=False):
     """Draw the bar panel + legends onto a given Axes.
 
     x_order is a list of (key, display_label) tuples — defaults to
@@ -389,8 +389,10 @@ def draw_panel(ax, agg, key_d0, key_d2k,
         fontsize=22,
         frameon=True, facecolor="white",
         edgecolor="#cfcfcf", framealpha=0.95,
-        handlelength=1.4, handletextpad=0.55, borderpad=0.45,
-        columnspacing=1.0,
+        handlelength=(1.15 if compact_legend else 1.4),
+        handletextpad=(0.35 if compact_legend else 0.55),
+        borderpad=0.45,
+        columnspacing=(0.55 if compact_legend else 1.0),
     )
 
 
@@ -402,12 +404,20 @@ def plot_panel(agg, key_d0, key_d2k, output_path,
     if bucket_colors is None:
         bucket_colors = BUCKET_COLORS
 
-    fig, ax = plt.subplots(figsize=(12.0, 5.0))
+    # Keep the axes area the same across prefill/decode. The prefill
+    # panel gets a taller canvas so its legend can live above the plot
+    # without shrinking the graph itself.
+    if with_legend:
+        fig, ax = plt.subplots(figsize=(12.0, 5.8))
+        fig.subplots_adjust(left=0.09, right=0.99, bottom=0.18, top=0.87)
+    else:
+        fig, ax = plt.subplots(figsize=(12.0, 5.0))
+        fig.subplots_adjust(left=0.09, right=0.99, bottom=0.18, top=0.98)
     draw_panel(ax, agg, key_d0, key_d2k,
                bucket_order, bucket_colors, legend_title,
-               with_legend=with_legend)
+               with_legend=with_legend,
+               compact_legend=with_legend)
     ax.set_ylabel("Tokens / second", fontsize=22)
-    fig.tight_layout()
     # bbox_extra_artists tells the tight-bbox calc to include the
     # legends that live above the axes, otherwise their titles get
     # visually clipped at the top edge of the saved area.
