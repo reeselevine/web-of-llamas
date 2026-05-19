@@ -35,25 +35,29 @@ from portability_bench import (
 # Configuration
 # ----------------------------------------------------------------------
 
-RUNS_DIR = "/tmp/webgpu-all/runs"
+DATA_TSV = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "portability_data.tsv")
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        "portability_study_figures")
 os.makedirs(OUT_DIR, exist_ok=True)
 VARIANT = "Q4_K_M"
 
-# Q4_K_M models sorted by approximate file size (small -> large).
-# Label format: "Name  (Q4_K_M size on disk)".
+# Order matches Table 3 in the paper: Q4_K_M file size ascending, with
+# Llama placed last because it's reused across the cross-quantization,
+# cross-framework, and browser-vs.-native studies. File sizes and the
+# Bonsai (Q1_0) caveat live in Table 3, so they're omitted from the
+# tick labels here.
 MODEL_ORDER = [
-    ("gemma-3-270m-it",                "gemma3\n(0.25 GB)"),
-    ("LFM2.5-350M",                    "lfm\n(0.23 GB)"),
-    ("Qwen3-0.6B",                     "qwen3\n(0.40 GB)"),
-    ("granite-4.0-h-1b",               "granite\n(0.90 GB)"),
-    ("Llama-3.2-1B-Instruct",          "llama\n(0.81 GB)"),
-    ("Bonsai-1.7B",                    "bonsai*\n(0.25 GB)"),
-    ("Qwen3.5-2B",                     "qwen3.5\n(1.28 GB)"),
-    ("gemma-4-E2B-it",                 "gemma4\n(3.11 GB)"),
-    ("SmolLM3-3B",                     "smollm\n(1.92 GB)"),
-    ("Ministral-3-3B-Instruct-2512",   "ministral\n(2.15 GB)"),
+    ("LFM2.5-350M",                    "lfm"),
+    ("Bonsai-1.7B",                    "bonsai"),
+    ("gemma-3-270m-it",                "gemma3"),
+    ("Qwen3-0.6B",                     "qwen3"),
+    ("granite-4.0-h-1b",               "granite"),
+    ("Qwen3.5-2B",                     "qwen3.5"),
+    ("SmolLM3-3B",                     "smollm"),
+    ("Ministral-3-3B-Instruct-2512",   "ministral"),
+    ("gemma-4-E2B-it",                 "gemma4"),
+    ("Llama-3.2-1B-Instruct",          "llama"),
 ]
 
 # Models that are admitted under a non-Q4_K_M quantization. Bonsai is
@@ -86,6 +90,7 @@ DEVICE_BUCKET = {
     "iPhone 17 Pro Max":     "<8 GB",
     "iPhone 15":             "<8 GB",
     "PowerVR D-series":      "<8 GB",
+    "Mali (Valhall)":        "<8 GB",   # 8 GB Android device, low-power Mali
     "M-series (Safari)":     None,        # exclude Mac Safari from main fig
 }
 
@@ -105,8 +110,12 @@ D2K_HATCH = "///"  # hatch pattern overlaid on KV depth 2048 bars
 
 
 # ----------------------------------------------------------------------
-# Data loading: Chrome where possible, Safari only when no Chrome
+# Data loading
 # ----------------------------------------------------------------------
+# portability_data.tsv is the canonical input. portability_data.py
+# dumps it from the raw JSON archive; the helpers below
+# (chrome_unless_only_safari, _dedup_one_per_cell) are kept exported
+# because the dumpers still rely on them.
 
 def chrome_unless_only_safari(records_for_device):
     has_chrome = any(
@@ -119,60 +128,31 @@ def chrome_unless_only_safari(records_for_device):
     return records_for_device
 
 
-def load_filtered(runs_dir):
-    """Return one record per (device, model). When multiple JSON records
-    cover the same cell, keep the one with the highest nReps; tiebreak
-    on the latest timestamp. d0-only and d2048-only records are deduped
-    independently (each cell gets one d0 record and one d2048 record),
-    then merged into a single record with all four metrics."""
-    import glob, json
-    raw = []
-    for fp in sorted(glob.glob(os.path.join(runs_dir, "**/*.json"),
-                               recursive=True)):
-        with open(fp) as f:
-            data = json.load(f)
-        if not isinstance(data, list):
-            continue
-        for rec in data:
-            if rec.get("status") != "done":
-                continue
-            model_id = rec.get("model")
-            variant = rec.get("variant")
-            allowed = (variant == VARIANT
-                       or EXTRA_VARIANT_MODELS.get(model_id) == variant)
-            if not allowed:
-                continue
-            resolved = resolve_device(rec)
-            if resolved is None:
-                continue
-            family, label = resolved
-            tests = (rec.get("metrics") or {}).get("tests") or []
-            metric = {"pp512_d0": None, "tg128_d0": None,
-                      "pp512_d2048": None, "tg128_d2048": None}
-            for t in tests:
-                nm, ts = t.get("name"), t.get("avg_ts")
-                if nm == "pp512":            metric["pp512_d0"] = ts
-                elif nm == "tg128":          metric["tg128_d0"] = ts
-                elif nm == "pp512 @ d2048":  metric["pp512_d2048"] = ts
-                elif nm == "tg128 @ d2048":  metric["tg128_d2048"] = ts
-            raw.append({
-                "family": family,
-                "label": label,
-                "model": rec.get("model"),
-                "browser": (rec.get("browser") or "").lower(),
-                "nReps": rec.get("nReps") or 0,
-                "timestamp": rec.get("timestamp") or "",
+METRIC_COLS = ["pp512_d0", "pp512_d2048", "tg128_d0", "tg128_d2048"]
+
+
+def load_portability_records(path=DATA_TSV):
+    """Read portability_data.tsv and return one record per (device,
+    model). The TSV is already deduped (browser preference, repetition
+    selection, d0/d2048 merge) by portability_data.py, so this is a
+    plain row-to-record mapping."""
+    import csv
+    records = []
+    with open(path, newline="") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            metric = {}
+            for k in METRIC_COLS:
+                cell = row.get(k, "")
+                metric[k] = float(cell) if cell else None
+            records.append({
+                "family": row["Family"],
+                "label": row["Device"],
+                "model": row["Model"],
+                "variant": row.get("Variant") or VARIANT,
                 "metric": metric,
             })
-
-    by_device = defaultdict(list)
-    for r in raw:
-        by_device[r["label"]].append(r)
-    browser_filtered = []
-    for recs in by_device.values():
-        browser_filtered.extend(chrome_unless_only_safari(recs))
-
-    return _dedup_one_per_cell(browser_filtered)
+    return records
 
 
 def _dedup_one_per_cell(records, cell_key=None):
@@ -263,14 +243,42 @@ def aggregate_by_bucket(records, device_bucket=None, exclude_labels=(),
 # Plot — visual style matched to benchmark_bars.py
 # ----------------------------------------------------------------------
 
+def _center_legend_pair(ax, leg_left, leg_right, center=0.5, gap=0.01):
+    """Reposition a pair of legends so they sit as a centered group.
+
+    The two legends are initially placed with bbox_to_anchor=(0.5, ...)
+    using loc="lower right" (left legend) and loc="lower left" (right
+    legend). After the first draw we can read each legend's rendered
+    width in axes coordinates and shift both anchors so the pair is
+    centered around `center` with `gap` between them. Naive symmetric
+    offsets bias the pair toward whichever legend is narrower.
+    """
+    ax.figure.canvas.draw()
+    inv = ax.transAxes.inverted()
+    lb = leg_left.get_window_extent().transformed(inv)
+    rb = leg_right.get_window_extent().transformed(inv)
+    w_left = lb.x1 - lb.x0
+    w_right = rb.x1 - rb.x0
+    left_anchor_x = center + (w_left - gap - w_right) / 2.0
+    right_anchor_x = left_anchor_x + gap
+    leg_left.set_bbox_to_anchor((left_anchor_x, 1.02))
+    leg_right.set_bbox_to_anchor((right_anchor_x, 1.02))
+
+
 def draw_panel(ax, agg, key_d0, key_d2k,
                bucket_order, bucket_colors, legend_title,
-               *, x_order=None, with_legend=True, with_xticklabels=True):
+               *, x_order=None, with_legend=True, with_xticklabels=True,
+               rotate_xticks=True):
     """Draw the bar panel + legends onto a given Axes.
 
     x_order is a list of (key, display_label) tuples — defaults to
     MODEL_ORDER for the portability figures; quantization passes
     VARIANT_ORDER.
+
+    rotate_xticks controls whether x-tick labels are angled at 30°
+    (default True for the 10-model portability figure) or rendered
+    horizontally (used by the quantization figure with 4 short labels
+    that fit without rotation).
     """
     if x_order is None:
         x_order = MODEL_ORDER
@@ -322,17 +330,25 @@ def draw_panel(ax, agg, key_d0, key_d2k,
             )
 
     ax.set_yscale("log")
-    ax.set_ylim(1.0, panel_max * 6.0)
+    # Legends now live above the axes, so the in-axes headroom can shrink.
+    ax.set_ylim(1.0, panel_max * 2.0)
     ax.yaxis.set_major_formatter(FuncFormatter(fmt_tps))
-    ax.tick_params(axis="y", labelsize=13)
+    ax.tick_params(axis="y", labelsize=20)
     ax.grid(axis="y", color=GRID_COLOR, linewidth=0.8, alpha=0.8)
     ax.set_axisbelow(True)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
     ax.set_xticks(x)
     if with_xticklabels:
+        # Portability uses rotation=30 because 10 longer model labels
+        # (e.g., "ministral", "qwen3.5") would otherwise collide at
+        # 22pt. Quantization passes rotate_xticks=False because its 4
+        # short variant labels (q2_k, q4_k_m, q8_0, f16) fit cleanly
+        # without rotation.
+        rot = 30 if rotate_xticks else 0
+        ha = "right" if rotate_xticks else "center"
         ax.set_xticklabels([disp for _, disp in x_order],
-                           rotation=0, ha="center", fontsize=12)
+                           rotation=rot, ha=ha, fontsize=22)
     else:
         ax.set_xticklabels([])
 
@@ -351,35 +367,36 @@ def draw_panel(ax, agg, key_d0, key_d2k,
         plt.Rectangle((0, 0), 1, 1, facecolor="white", hatch=D2K_HATCH,
                       edgecolor=EDGE_COLOR, linewidth=EDGE_WIDTH),
     ]
-    leg_ram = ax.legend(
-        bucket_handles, list(bucket_order),
-        title=legend_title, loc="upper right",
-        bbox_to_anchor=(1.0, 1.0),
-        fontsize=11, title_fontsize=11,
-        frameon=True, facecolor="white",
-        edgecolor="#cfcfcf", framealpha=0.95,
-        handlelength=1.4, handletextpad=0.55, borderpad=0.45,
+    # Single horizontal legend above the axes, with the section labels
+    # ("Cluster:", "KV depth:") inlined as text-only entries before
+    # each group of swatches. Keeps both groups visible without the
+    # title-on-top-of-entries vertical stacking matplotlib uses by
+    # default for the legend title.
+    import matplotlib.patches as mpatches
+    spacer = mpatches.Patch(visible=False)
+    combined_handles = (
+        [spacer] + bucket_handles + [spacer] + depth_handles
     )
-    ax.add_artist(leg_ram)
-
-    ax.figure.canvas.draw()
-    ram_bbox = leg_ram.get_window_extent().transformed(ax.transAxes.inverted())
-    kv_right = ram_bbox.x0 - 0.015
-
+    combined_labels = (
+        [f"{legend_title}:"] + list(bucket_order)
+        + ["KV depth:", "0", "2048"]
+    )
     ax.legend(
-        depth_handles, ["0", "2048"],
-        title="KV depth", loc="upper right",
-        bbox_to_anchor=(kv_right, 1.0),
-        fontsize=11, title_fontsize=11,
+        combined_handles, combined_labels,
+        loc="lower center",
+        bbox_to_anchor=(0.5, 1.02),
+        ncol=len(combined_handles),
+        fontsize=22,
         frameon=True, facecolor="white",
         edgecolor="#cfcfcf", framealpha=0.95,
         handlelength=1.4, handletextpad=0.55, borderpad=0.45,
+        columnspacing=1.0,
     )
 
 
 def plot_panel(agg, key_d0, key_d2k, output_path,
                bucket_order=None, bucket_colors=None,
-               legend_title="RAM"):
+               legend_title="RAM", with_legend=True):
     if bucket_order is None:
         bucket_order = BUCKET_ORDER
     if bucket_colors is None:
@@ -387,10 +404,17 @@ def plot_panel(agg, key_d0, key_d2k, output_path,
 
     fig, ax = plt.subplots(figsize=(12.0, 5.0))
     draw_panel(ax, agg, key_d0, key_d2k,
-               bucket_order, bucket_colors, legend_title)
-    ax.set_ylabel("Tokens / second", fontsize=15)
+               bucket_order, bucket_colors, legend_title,
+               with_legend=with_legend)
+    ax.set_ylabel("Tokens / second", fontsize=22)
     fig.tight_layout()
-    fig.savefig(output_path, bbox_inches="tight")
+    # bbox_extra_artists tells the tight-bbox calc to include the
+    # legends that live above the axes, otherwise their titles get
+    # visually clipped at the top edge of the saved area.
+    from matplotlib.legend import Legend
+    extras = [c for c in ax.get_children() if isinstance(c, Legend)]
+    fig.savefig(output_path, bbox_inches="tight",
+                bbox_extra_artists=extras)
     plt.close(fig)
 
 
@@ -497,10 +521,10 @@ def assign_cluster_buckets(records, k=3):
     print(f"\nChose k={k}; inertia={inertia:.4f}")
 
     # Order clusters by *measured* throughput (ignoring imputed cells)
-    # so "Cluster A" is the fastest devices, "B" the mid-tier, and "C"
-    # the slowest. Ranking off the post-imputation feature matrix
-    # inflates devices with lots of missing cells (iPhones get the
-    # dataset median per column), which previously flipped B and C.
+    # so the "high" cluster is the fastest devices, "mid" the mid-tier,
+    # and "low" the slowest. Ranking off the post-imputation feature
+    # matrix inflates devices with lots of missing cells (iPhones get
+    # the dataset median per column), which previously flipped mid/low.
     device_mean_log = {}
     for r in records:
         if r["label"] in CLUSTER_EXCLUDE:
@@ -521,11 +545,13 @@ def assign_cluster_buckets(records, k=3):
     remap = {old: new for new, old in enumerate(order)}
     cluster_idx = np.array([remap[c] for c in cluster_idx])
 
-    names = [chr(ord("A") + i) for i in range(k)]
-    device_bucket = {lbl: f"Cluster {names[c]}"
+    # Cluster names match the prose in the paper.
+    CLUSTER_NAMES = ["high", "mid", "low", "tier4", "tier5"]
+    names = CLUSTER_NAMES[:k]
+    device_bucket = {lbl: names[c]
                      for lbl, c in zip(labels, cluster_idx)}
 
-    bucket_order = [f"Cluster {n}" for n in names]
+    bucket_order = list(names)
     palette_seq = [PALETTE["blue"], PALETTE["orange"],
                    PALETTE["pink"], PALETTE["green"], PALETTE["purple"]]
     bucket_colors = {b: palette_seq[i] for i, b in enumerate(bucket_order)}
@@ -554,21 +580,32 @@ def print_summary(label, agg, bucket_order):
 
 
 def main():
-    records = load_filtered(RUNS_DIR)
-    print(f"Records after Chrome/Safari filter: {len(records)}")
+    records = load_portability_records()
+    print(f"Loaded {len(records)} records from {DATA_TSV}")
 
     cluster_bucket, cluster_order, cluster_colors = \
         assign_cluster_buckets(records, k=3)
 
     agg = aggregate_by_bucket(records, device_bucket=cluster_bucket)
+
+    # Qwen3.5 ran on too few low-cluster devices for a single-bar
+    # cluster median to be meaningful — drop it from the main figure.
+    # Per-device throughput for these devices still appears in the
+    # appendix figure for Qwen3.5.
+    if "Qwen3.5-2B" in agg:
+        agg["Qwen3.5-2B"].pop("low", None)
+
     print_summary("cluster main figure", agg, cluster_order)
 
     for slug, key_d0, key_d2k in PANELS:
         out_path = os.path.join(OUT_DIR, f"portability_main_{slug}.pdf")
+        # Decode sits directly under prefill in the paper; legend only
+        # on prefill to avoid duplicating it.
         plot_panel(agg, key_d0, key_d2k, out_path,
                    bucket_order=cluster_order,
                    bucket_colors=cluster_colors,
-                   legend_title="Cluster")
+                   legend_title="Cluster",
+                   with_legend=(slug == "prefill"))
         print(f"Wrote {out_path}")
 
 

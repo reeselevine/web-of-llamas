@@ -33,6 +33,7 @@ FAMILY_COLORS = {
     "Qualcomm":  "#b39ddb",  # purple
     "Samsung":   "#b39ddb",  # purple
     "Img Tec":   "#b39ddb",  # purple
+    "ARM":       "#b39ddb",  # purple (hatched to distinguish from Qualcomm)
 }
 
 FAMILY_HATCH = {
@@ -44,11 +45,12 @@ FAMILY_HATCH = {
     "Qualcomm":  "",
     "Samsung":   "xx",   # Android distinguished from ARM-Windows X Elite
     "Img Tec":   "..",
+    "ARM":       "\\\\",  # ARM Mali distinguished from Qualcomm/Samsung/Img Tec
 }
 
 FAMILY_ORDER = [
     "NVIDIA", "AMD", "Intel", "Apple-Mac", "Apple-iOS",
-    "Qualcomm", "Samsung", "Img Tec",
+    "Qualcomm", "Samsung", "ARM", "Img Tec",
 ]
 
 EDGE_COLOR = "#2f2f2f"
@@ -106,7 +108,10 @@ def resolve_device(record):
                 return ("Apple-iOS", "iPhone 15")
             if "macbook" in mname or " m4" in mname or " m3" in mname:
                 return ("Apple-Mac", "M-series (Safari)")
-            return None  # anonymous webkit run — skip
+            # Fully anonymous Apple Safari runs (mname stripped to
+            # "apple apple apple apple"): confirmed by submitters to
+            # be MacBooks, not iPhones.
+            return ("Apple-Mac", "M-series (Safari)")
         # Chromium on macOS
         if "0x0000" in dev_id or " m2" in mname or "m2 " in mname:
             return ("Apple-Mac", "M2")
@@ -114,10 +119,16 @@ def resolve_device(record):
             return ("Apple-Mac", "M3 (16 GB)")
         if "m4" in mname or ram >= 32:
             return ("Apple-Mac", "M4 (32 GB)")
-        return None  # anonymous metal-3 — skip
+        # Anonymous "apple metal-3 · 16 GB" Chrome runs: submitters
+        # (aramesh2k, Hammez) confirmed these are M3 MacBooks.
+        if "metal-3" in arch and ram == 16:
+            return ("Apple-Mac", "M3 (16 GB)")
+        return None
 
-    # Qualcomm
-    if vendor == "qualcomm":
+    # Qualcomm — also catch records where the WebGPU adapter info has
+    # null vendor but the user-reported machineName names an Adreno
+    # GPU (some Android browsers strip the adapter vendor field).
+    if vendor == "qualcomm" or "adreno" in mname:
         if "x1-85" in mname or "0x36334330" in dev_id:
             return ("Qualcomm", "Snapdragon X Elite")
         if "adreno-7xx" in arch or "adreno-7" in mname:
@@ -131,6 +142,12 @@ def resolve_device(record):
     # Imagination
     if "img" in vendor or "img-tec" in vendor:
         return ("Img Tec", "PowerVR D-series")
+
+    # ARM (Mali)
+    if vendor == "arm":
+        if "valhall" in arch:
+            return ("ARM", "Mali (Valhall)")
+        return None
 
     return None
 

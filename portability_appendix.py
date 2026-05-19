@@ -37,10 +37,11 @@ from portability_bench import (
     FAMILY_COLORS, FAMILY_HATCH, FAMILY_ORDER,
     fmt_tps,
 )
-from portability_main_2x2 import MODEL_ORDER, PANELS, load_filtered
+from portability_main_2x2 import (
+    MODEL_ORDER, PANELS, load_portability_records, _center_legend_pair,
+)
 
 
-RUNS_DIR = "/tmp/webgpu-all/runs"
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        "portability_study_figures")
 os.makedirs(OUT_DIR, exist_ok=True)
@@ -66,6 +67,7 @@ DEVICE_DISPLAY = {
     "iPhone 17 Pro Max":     "iPhone 17\nPro Max",
     "iPhone 15":             "iPhone 15",
     "PowerVR D-series":      "PowerVR\nD-series",
+    "Mali (Valhall)":        "Mali\n(Valhall)",
 }
 
 
@@ -125,13 +127,14 @@ def ordered_devices(per_device):
 # ----------------------------------------------------------------------
 
 def plot_coverage(per_device, key_d0, key_d2k, phase_label, output_path,
-                  x_order=None):
+                  x_order=None, rotate_xticks=True):
     """Coverage heatmap for one phase (prefill or decode).
 
     phase_label is e.g. "Prefill" / "Decode" and only appears on the
     colorbar legend; the caption explains the figure.
     x_order defaults to MODEL_ORDER (portability study). Quantization
-    passes VARIANT_ORDER.
+    passes VARIANT_ORDER plus rotate_xticks=False (4 short variant
+    labels fit horizontally).
     """
     if x_order is None:
         x_order = MODEL_ORDER
@@ -185,23 +188,28 @@ def plot_coverage(per_device, key_d0, key_d2k, phase_label, output_path,
                 shade = (np.log10(v) - log_floor) / log_span
                 color = "white" if shade > 0.55 else "#1f1f1f"
                 ax.text(mi, di, fmt_tps(v, None),
-                        ha="center", va="center", fontsize=10, color=color)
+                        ha="center", va="center", fontsize=15, color=color)
 
         ax.set_xticks(range(len(models)))
+        # Portability heatmap angles its 10 model labels to fit; the
+        # quantization heatmap with only 4 short variant labels passes
+        # rotate_xticks=False to keep them horizontal.
+        rot = 30 if rotate_xticks else 0
+        ha = "right" if rotate_xticks else "center"
         ax.set_xticklabels([d for _, d in models],
-                           rotation=0, ha="center", fontsize=11)
+                           rotation=rot, ha=ha, fontsize=18)
         ax.set_yticks(range(len(devices)))
-        ax.set_yticklabels([lbl for lbl, _ in devices], fontsize=11)
-        ax.set_title(depth_label, fontsize=13, pad=8)
+        ax.set_yticklabels([lbl for lbl, _ in devices], fontsize=18)
+        ax.set_title(depth_label, fontsize=20, pad=8)
         ax.spines["top"].set_visible(False)
         ax.spines["right"].set_visible(False)
 
     cbar = fig.colorbar(im, ax=axes.ravel().tolist(),
                         shrink=0.85, pad=0.02)
     cbar.ax.yaxis.set_major_formatter(FuncFormatter(fmt_tps))
-    cbar.ax.tick_params(labelsize=11)
+    cbar.ax.tick_params(labelsize=18)
     cbar.set_label(f"{phase_label} tokens / second (log scale)",
-                   fontsize=12)
+                   fontsize=20)
 
     fig.savefig(output_path, bbox_inches="tight")
     plt.close(fig)
@@ -217,13 +225,22 @@ PANEL_KEYS = [
 ]
 
 
-def plot_panel_per_device(per_device, model_id, key_d0, key_d2k, output_path):
+def plot_panel_per_device(per_device, model_id, key_d0, key_d2k, output_path,
+                          with_legend=True, legend_families=None):
     """Single-panel per-device figure for one (model, phase) pair.
 
-    Style follows CLAUDE.md (log y, no title, in-axes top-right legends,
-    larger fonts). KV depth is encoded with alpha rather than hatch
-    because hatch is already used to disambiguate device families that
-    share a color (Apple-iOS/Mac, Qualcomm/Samsung/Img Tec).
+    Style follows CLAUDE.md (log y, no title, larger fonts).
+    Legends sit above the axes in horizontal layout; with_legend=False
+    suppresses them when this panel is paired adjacent to another in
+    the paper (decode next to prefill in the same row, or a later row
+    within the same figure-page that shares the page's first legend).
+    legend_families, when provided, overrides the automatic per-panel
+    family detection — used to render a master legend covering every
+    family that appears anywhere in the figure-page group, even if a
+    given panel only uses a subset.
+    KV depth is encoded with alpha rather than hatch because hatch is
+    already used to disambiguate device families that share a color
+    (Apple-iOS/Mac, Qualcomm/Samsung/Img Tec).
     """
     by_dev = per_device.get(model_id, {})
     if not by_dev:
@@ -268,24 +285,31 @@ def plot_panel_per_device(per_device, model_id, key_d0, key_d2k, output_path):
     panel_max = np.nanmax(all_vals) if np.isfinite(all_vals).any() else 1.0
 
     ax.set_yscale("log")
-    ax.set_ylim(1.0, panel_max * 6.0)
+    # Legends now live above the axes, so the in-axes headroom can shrink.
+    ax.set_ylim(1.0, panel_max * 2.0)
     ax.set_xticks(x)
+    # GPU names rotated 30° so even the densest panel (lfm with 16
+    # devices in 15.5") can carry the same 22pt size used for the
+    # in-panel legends.
     ax.set_xticklabels(
-        [DEVICE_DISPLAY.get(lbl, lbl) for lbl in labels],
-        rotation=0, ha="center", fontsize=10,
+        [DEVICE_DISPLAY.get(lbl, lbl).replace("\n", " ") for lbl in labels],
+        rotation=30, ha="right", fontsize=22,
     )
     ax.yaxis.set_major_formatter(FuncFormatter(fmt_tps))
-    ax.tick_params(axis="y", labelsize=13)
+    ax.tick_params(axis="y", labelsize=20)
     ax.grid(axis="y", color=GRID_COLOR, linewidth=0.8, alpha=0.8)
     ax.set_axisbelow(True)
     ax.spines["top"].set_visible(False)
     ax.spines["right"].set_visible(False)
-    ax.set_ylabel("Tokens / second", fontsize=15)
+    ax.set_ylabel("Tokens / second", fontsize=22)
 
-    present = []
-    for f in FAMILY_ORDER:
-        if f in families and f not in present:
-            present.append(f)
+    if legend_families is not None:
+        present = [f for f in FAMILY_ORDER if f in legend_families]
+    else:
+        present = []
+        for f in FAMILY_ORDER:
+            if f in families and f not in present:
+                present.append(f)
     family_handles = [plt.Rectangle((0, 0), 1, 1,
                                     facecolor=FAMILY_COLORS[f],
                                     hatch=FAMILY_HATCH[f],
@@ -299,33 +323,58 @@ def plot_panel_per_device(per_device, model_id, key_d0, key_d2k, output_path):
                       edgecolor=EDGE_COLOR, linewidth=EDGE_WIDTH),
     ]
 
-    leg_fam = ax.legend(
-        family_handles, present,
-        title="Family", loc="upper right",
-        bbox_to_anchor=(1.0, 1.0),
-        fontsize=11, title_fontsize=11,
-        frameon=True, facecolor="white",
-        edgecolor="#cfcfcf", framealpha=0.95,
-        handlelength=1.4, handletextpad=0.55, borderpad=0.45,
-    )
-    ax.add_artist(leg_fam)
+    # Two legend boxes above the axes, single horizontal row of
+    # entries inside each box. With up to 8 device families plus the
+    # KV depth box, the pair is wide; we keep columnspacing tight and
+    # let bbox_inches="tight"+bbox_extra_artists expand the saved area
+    # to include any overflow past the axes edge. _center_legend_pair
+    # then compensates for the width imbalance between Family and KV
+    # depth so the pair reads as centered. The decode panel for the
+    # same model sits adjacent in the paper's subfigure pair, so
+    # legends are rendered on prefill only (with_legend).
+    extras = []
+    if with_legend:
+        # With bumped fonts the Family legend wraps to two balanced
+        # rows whenever it has more than four entries; the single-row
+        # version overflows past the figure edge and gets clipped on
+        # fig 9 (8 families at 22pt).
+        if len(present) > 4:
+            fam_ncol = (len(present) + 1) // 2
+        else:
+            fam_ncol = len(present)
+        leg_fam = ax.legend(
+            family_handles, present,
+            title="Family", loc="lower right",
+            bbox_to_anchor=(0.5, 1.02),
+            ncol=fam_ncol,
+            fontsize=22, title_fontsize=22,
+            frameon=True, facecolor="white",
+            edgecolor="#cfcfcf", framealpha=0.95,
+            handlelength=1.4, handletextpad=0.55, borderpad=0.45,
+            columnspacing=1.0,
+        )
+        ax.add_artist(leg_fam)
 
-    fig.canvas.draw()
-    fam_bbox = leg_fam.get_window_extent().transformed(ax.transAxes.inverted())
-    kv_right = fam_bbox.x0 - 0.015
-
-    ax.legend(
-        depth_handles, ["0", "2048"],
-        title="KV depth", loc="upper right",
-        bbox_to_anchor=(kv_right, 1.0),
-        fontsize=11, title_fontsize=11,
-        frameon=True, facecolor="white",
-        edgecolor="#cfcfcf", framealpha=0.95,
-        handlelength=1.4, handletextpad=0.55, borderpad=0.45,
-    )
+        leg_kv = ax.legend(
+            depth_handles, ["0", "2048"],
+            title="KV depth", loc="lower left",
+            bbox_to_anchor=(0.5, 1.02),
+            ncol=2,
+            fontsize=22, title_fontsize=22,
+            frameon=True, facecolor="white",
+            edgecolor="#cfcfcf", framealpha=0.95,
+            handlelength=1.4, handletextpad=0.55, borderpad=0.45,
+            columnspacing=1.0,
+        )
+        _center_legend_pair(ax, leg_fam, leg_kv)
+        extras = [leg_fam, leg_kv]
 
     fig.tight_layout()
-    fig.savefig(output_path, bbox_inches="tight")
+    # bbox_extra_artists ensures the tight bounding-box calculation
+    # includes the legends, whose titles otherwise sit just above the
+    # saved area and get visually clipped at the top edge.
+    fig.savefig(output_path, bbox_inches="tight",
+                bbox_extra_artists=extras)
     plt.close(fig)
     return True
 
@@ -333,8 +382,8 @@ def plot_panel_per_device(per_device, model_id, key_d0, key_d2k, output_path):
 # ----------------------------------------------------------------------
 
 def main():
-    records = load_filtered(RUNS_DIR)
-    print(f"Loaded {len(records)} Q4_K_M records (Chrome where available)")
+    records = load_portability_records()
+    print(f"Loaded {len(records)} portability records from TSV")
     per_device = aggregate_per_device(records)
 
     # App-A (one coverage figure per phase)
@@ -348,14 +397,40 @@ def main():
         plot_coverage(per_device, key_d0, key_d2k, label, out)
         print(f"Wrote {out}")
 
-    # App-B (one PDF per (model, phase) for subfigure composition)
+    # App-B (one PDF per (model, phase) for subfigure composition).
+    # Each figure-page in the paper groups 5 models into a 5-row 2-col
+    # tabular (prefill left, decode right). Within a page the legend
+    # would be identical, so it's drawn on the first model's prefill
+    # only, using a master legend that covers the union of device
+    # families across every panel on the page. All other panels (other
+    # models' prefill, plus every decode) get no legend.
+    FIGURE_GROUPS = [
+        [mid for mid, _ in MODEL_ORDER[:5]],   # part 1 of 2
+        [mid for mid, _ in MODEL_ORDER[5:]],   # part 2 of 2
+    ]
+    page_master_family = {}  # model_id -> set of families for its page's legend
+    page_first_model = set()
+    for group in FIGURE_GROUPS:
+        union = set()
+        for mid in group:
+            for label, info in per_device.get(mid, {}).items():
+                if info.get("family"):
+                    union.add(info["family"])
+        page_master_family[group[0]] = union
+        page_first_model.add(group[0])
+
     for mid, _disp in MODEL_ORDER:
         for slug, key_d0, key_d2k in PANEL_KEYS:
             out = os.path.join(
                 OUT_DIR,
                 f"portability_appendix_{slugify(mid)}_{slug}.pdf",
             )
-            ok = plot_panel_per_device(per_device, mid, key_d0, key_d2k, out)
+            show_legend = (slug == "prefill") and (mid in page_first_model)
+            master = page_master_family.get(mid) if show_legend else None
+            ok = plot_panel_per_device(
+                per_device, mid, key_d0, key_d2k, out,
+                with_legend=show_legend, legend_families=master,
+            )
             if ok:
                 print(f"Wrote {out}")
             else:

@@ -33,14 +33,13 @@ from quantization_main_2x2 import (
 )
 
 
-RUNS_DIR = "/tmp/webgpu-all/runs"
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        "quantization_study_figures")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 
 def main():
-    records = load_quant_records(RUNS_DIR)
+    records = load_quant_records()
     print(f"Loaded {len(records)} {MODEL} quantization records")
 
     per_device = aggregate_per_device(records, key_field="variant")
@@ -55,18 +54,33 @@ def main():
             OUT_DIR, f"quantization_appendix_coverage_{slug}.pdf"
         )
         plot_coverage(per_device, key_d0, key_d2k, label, out,
-                      x_order=VARIANT_ORDER)
+                      x_order=VARIANT_ORDER, rotate_xticks=False)
         print(f"Wrote {out}")
 
-    # App-B (one PDF per (variant, phase))
+    # App-B (one PDF per (variant, phase)). All four variants live on
+    # one figure-page in the paper; the legend would be identical
+    # across them, so it's drawn on the first variant's prefill only,
+    # using a master legend that covers every family that appears in
+    # any variant. Every other panel gets no legend.
+    first_variant = VARIANT_ORDER[0][0]
+    master_families = set()
+    for variant, _ in VARIANT_ORDER:
+        for _label, info in per_device.get(variant, {}).items():
+            if info.get("family"):
+                master_families.add(info["family"])
+
     for variant, _disp in VARIANT_ORDER:
         for slug, key_d0, key_d2k in PANELS:
             out = os.path.join(
                 OUT_DIR,
                 f"quantization_appendix_{slugify(variant)}_{slug}.pdf",
             )
-            ok = plot_panel_per_device(per_device, variant,
-                                       key_d0, key_d2k, out)
+            show_legend = (slug == "prefill") and (variant == first_variant)
+            master = master_families if show_legend else None
+            ok = plot_panel_per_device(
+                per_device, variant, key_d0, key_d2k, out,
+                with_legend=show_legend, legend_families=master,
+            )
             if ok:
                 print(f"Wrote {out}")
             else:

@@ -2,7 +2,7 @@ Cluster	Cluster A	Phase	Prefill	KV depth	0
 Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
 Q2_K	1.00x	0.79x	0.74x	0.59x
 Q4_K_M		1.00x	0.93x	0.75x
-Q8_0			1.00x	0.80x
+Q8_0			1.00x	0.81x
 F16				1.00x
 
 Cluster	Cluster A	Phase	Prefill	KV depth	2048
@@ -14,44 +14,44 @@ F16				1.00x
 
 Cluster	Cluster A	Phase	Decode	KV depth	0
 Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
-Q2_K	1.00x	0.80x	0.81x	0.98x
-Q4_K_M		1.00x	1.01x	1.23x
-Q8_0			1.00x	1.21x
+Q2_K	1.00x	0.80x	0.82x	0.98x
+Q4_K_M		1.00x	1.02x	1.22x
+Q8_0			1.00x	1.20x
 F16				1.00x
 
 Cluster	Cluster A	Phase	Decode	KV depth	2048
 Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
 Q2_K	1.00x	0.95x	1.00x	1.18x
-Q4_K_M		1.00x	1.05x	1.25x
-Q8_0			1.00x	1.19x
+Q4_K_M		1.00x	1.06x	1.25x
+Q8_0			1.00x	1.18x
 F16				1.00x
 
 Cluster	Cluster B	Phase	Prefill	KV depth	0
 Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
-Q2_K	1.00x	0.63x	0.49x	0.40x
+Q2_K	1.00x	0.62x	0.48x	0.39x
 Q4_K_M		1.00x	0.78x	0.64x
 Q8_0			1.00x	0.82x
 F16				1.00x
 
 Cluster	Cluster B	Phase	Prefill	KV depth	2048
 Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
-Q2_K	1.00x	0.70x	0.57x	0.49x
-Q4_K_M		1.00x	0.81x	0.69x
-Q8_0			1.00x	0.85x
+Q2_K	1.00x	0.71x	0.59x	0.52x
+Q4_K_M		1.00x	0.83x	0.73x
+Q8_0			1.00x	0.87x
 F16				1.00x
 
 Cluster	Cluster B	Phase	Decode	KV depth	0
 Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
-Q2_K	1.00x	0.85x	0.91x	1.33x
-Q4_K_M		1.00x	1.07x	1.56x
-Q8_0			1.00x	1.46x
+Q2_K	1.00x	0.83x	0.90x	1.37x
+Q4_K_M		1.00x	1.08x	1.65x
+Q8_0			1.00x	1.53x
 F16				1.00x
 
 Cluster	Cluster B	Phase	Decode	KV depth	2048
 Lower-bit vs higher-bit	Q2_K	Q4_K_M	Q8_0	F16
-Q2_K	1.00x	0.92x	0.97x	1.34x
-Q4_K_M		1.00x	1.06x	1.47x
-Q8_0			1.00x	1.38x
+Q2_K	1.00x	0.91x	0.95x	1.39x
+Q4_K_M		1.00x	1.04x	1.52x
+Q8_0			1.00x	1.46x
 F16				1.00x
 
 Cluster	Cluster C	Phase	Prefill	KV depth	0

@@ -20,29 +20,28 @@ from statistics import median
 
 import matplotlib.pyplot as plt
 
-from portability_bench import resolve_device
 from portability_main_2x2 import (
-    aggregate_by_bucket, assign_cluster_buckets,
-    chrome_unless_only_safari, draw_panel,
-    _dedup_one_per_cell,
-    load_filtered as load_portability_records,
+    aggregate_by_bucket, assign_cluster_buckets, draw_panel,
+    load_portability_records,
 )
 
 
-RUNS_DIR = "/tmp/webgpu-all/runs"
+DATA_TSV = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                        "quantization_data.tsv")
 OUT_DIR = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                        "quantization_study_figures")
 os.makedirs(OUT_DIR, exist_ok=True)
 
 MODEL = "Llama-3.2-1B-Instruct"
 
-# Variants sorted by bit-width (smallest first). Sizes are Llama 3.2 1B
-# Q*_K and F16 file sizes from the Hugging Face GGUFs.
+# Variants sorted by bit-width (smallest first). File sizes for each
+# Llama 3.2 1B variant live in Table 3, so they're not duplicated on
+# the tick labels here.
 VARIANT_ORDER = [
-    ("Q2_K",   "Q2_K\n(0.58 GB)"),
-    ("Q4_K_M", "Q4_K_M\n(0.81 GB)"),
-    ("Q8_0",   "Q8_0\n(1.32 GB)"),
-    ("F16",    "F16\n(2.48 GB)"),
+    ("Q2_K",   "q2_k"),
+    ("Q4_K_M", "q4_k_m"),
+    ("Q8_0",   "q8_0"),
+    ("F16",    "f16"),
 ]
 VARIANT_KEYS = [k for k, _ in VARIANT_ORDER]
 
@@ -51,62 +50,47 @@ PANELS = [
     ("decode",  "tg128_d0", "tg128_d2048"),
 ]
 
+# quantization_data.tsv stores one row per (device, phase, depth), with
+# a column per variant. The plot code wants the inverted shape — one
+# record per (device, variant) carrying all four phase/depth metrics —
+# so the loader pivots back into that form.
+PHASE_DEPTH_TO_METRIC = {
+    ("Prefill", "0"):    "pp512_d0",
+    ("Prefill", "2048"): "pp512_d2048",
+    ("Decode",  "0"):    "tg128_d0",
+    ("Decode",  "2048"): "tg128_d2048",
+}
 
-def load_quant_records(runs_dir):
-    """Llama records across the four quantization variants, with the
-    same Chrome-where-available browser preference used elsewhere."""
-    import glob, json
-    raw = []
-    for fp in sorted(glob.glob(os.path.join(runs_dir, "**/*.json"),
-                               recursive=True)):
-        with open(fp) as f:
-            data = json.load(f)
-        if not isinstance(data, list):
-            continue
-        for rec in data:
-            if rec.get("status") != "done":
-                continue
-            if rec.get("model") != MODEL:
-                continue
-            if rec.get("variant") not in VARIANT_KEYS:
-                continue
-            resolved = resolve_device(rec)
-            if resolved is None:
-                continue
-            family, label = resolved
-            tests = (rec.get("metrics") or {}).get("tests") or []
-            metric = {"pp512_d0": None, "tg128_d0": None,
-                      "pp512_d2048": None, "tg128_d2048": None}
-            for t in tests:
-                nm, ts = t.get("name"), t.get("avg_ts")
-                if nm == "pp512":            metric["pp512_d0"] = ts
-                elif nm == "tg128":          metric["tg128_d0"] = ts
-                elif nm == "pp512 @ d2048":  metric["pp512_d2048"] = ts
-                elif nm == "tg128 @ d2048":  metric["tg128_d2048"] = ts
-            raw.append({
-                "family": family,
-                "label": label,
-                "variant": rec.get("variant"),
-                "browser": (rec.get("browser") or "").lower(),
-                "nReps": rec.get("nReps") or 0,
-                "timestamp": rec.get("timestamp") or "",
-                "metric": metric,
-            })
 
-    by_device = defaultdict(list)
-    for r in raw:
-        by_device[r["label"]].append(r)
-    browser_filtered = []
-    for recs in by_device.values():
-        browser_filtered.extend(chrome_unless_only_safari(recs))
-
-    # Same dedup policy as the portability loader: keep one record per
-    # (device, variant, depth-class), pick by highest nReps then latest
-    # timestamp, merge d0+d2048 into a single record per cell.
-    return _dedup_one_per_cell(
-        browser_filtered,
-        cell_key=lambda r: (r["label"], r["family"], r["variant"]),
-    )
+def load_quant_records(path=DATA_TSV):
+    """Read quantization_data.tsv and return one record per (device,
+    variant) with the four phase/depth metric keys populated."""
+    import csv
+    accum = {}  # (label, variant) -> {family, metric}
+    with open(path, newline="") as f:
+        reader = csv.DictReader(f, delimiter="\t")
+        for row in reader:
+            metric_key = PHASE_DEPTH_TO_METRIC.get(
+                (row["Phase"], row["KV depth"])
+            )
+            if metric_key is None:
+                continue
+            label = row["Device"]
+            family = row["Family"]
+            for variant in VARIANT_KEYS:
+                cell = row.get(variant, "")
+                if not cell:
+                    continue
+                key = (label, variant)
+                if key not in accum:
+                    accum[key] = {
+                        "family": family,
+                        "label": label,
+                        "variant": variant,
+                        "metric": {k: None for k in PHASE_DEPTH_TO_METRIC.values()},
+                    }
+                accum[key]["metric"][metric_key] = float(cell)
+    return list(accum.values())
 
 
 def print_summary(agg, bucket_order):
@@ -124,25 +108,34 @@ def print_summary(agg, bucket_order):
 
 
 def plot_panel(agg, key_d0, key_d2k, output_path,
-               bucket_order, bucket_colors, legend_title="Cluster"):
+               bucket_order, bucket_colors, legend_title="Cluster",
+               with_legend=True):
     fig, ax = plt.subplots(figsize=(12.0, 5.0))
     draw_panel(ax, agg, key_d0, key_d2k,
                bucket_order, bucket_colors, legend_title,
-               x_order=VARIANT_ORDER)
-    ax.set_ylabel("Tokens / second", fontsize=15)
+               x_order=VARIANT_ORDER,
+               with_legend=with_legend,
+               rotate_xticks=False)
+    ax.set_ylabel("Tokens / second", fontsize=22)
     fig.tight_layout()
-    fig.savefig(output_path, bbox_inches="tight")
+    # bbox_extra_artists tells the tight-bbox calc to include the
+    # legends that live above the axes, otherwise their titles get
+    # visually clipped at the top edge of the saved area.
+    from matplotlib.legend import Legend
+    extras = [c for c in ax.get_children() if isinstance(c, Legend)]
+    fig.savefig(output_path, bbox_inches="tight",
+                bbox_extra_artists=extras)
     plt.close(fig)
 
 
 def main():
     # Cluster taxonomy is computed from the full portability data set
     # so the device groupings match the portability figure exactly.
-    portability_records = load_portability_records(RUNS_DIR)
+    portability_records = load_portability_records()
     cluster_bucket, cluster_order, cluster_colors = \
         assign_cluster_buckets(portability_records, k=3)
 
-    quant_records = load_quant_records(RUNS_DIR)
+    quant_records = load_quant_records()
     print(f"\nQuantization records (llama, Q2/Q4/Q8/F16): {len(quant_records)}")
 
     # aggregate_by_bucket groups by `key_field`; for the quantization
@@ -153,20 +146,26 @@ def main():
         key_field="variant",
     )
 
-    # Drop any cluster that has no data in this study (low-end-mobile
-    # devices typically didn't run the quantization sweep) so the
-    # legend doesn't list empty entries.
+    # Drop any cluster that has no data in this study. The low cluster
+    # is always excluded — the paper prose in §7 frames the study as
+    # high+mid only because the larger Llama variants exceed mobile
+    # tab-memory budgets, and any stray low-cluster record (e.g. a
+    # single Q8_0 submission) would otherwise contradict that framing.
     present_clusters = {b for v in agg.values() for b in v}
-    cluster_order = [b for b in cluster_order if b in present_clusters]
+    cluster_order = [b for b in cluster_order
+                     if b in present_clusters and b != "low"]
     print(f"Clusters with data: {cluster_order}")
 
     print_summary(agg, cluster_order)
 
     for slug, key_d0, key_d2k in PANELS:
         out_path = os.path.join(OUT_DIR, f"quantization_main_{slug}.pdf")
+        # Decode sits directly under prefill in the paper; legend only
+        # on prefill to avoid duplicating it.
         plot_panel(agg, key_d0, key_d2k, out_path,
                    bucket_order=cluster_order,
-                   bucket_colors=cluster_colors)
+                   bucket_colors=cluster_colors,
+                   with_legend=(slug == "prefill"))
         print(f"Wrote {out_path}")
 
 
